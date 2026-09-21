@@ -1,0 +1,1 @@
+package org.maplibre.android.camera; public class CameraUpdateFactory { public static CameraUpdate newCameraPosition(CameraPosition p){return null;} public static CameraUpdate zoomTo(double z){return null;} }

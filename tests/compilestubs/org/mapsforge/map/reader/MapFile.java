@@ -1,0 +1,1 @@
+package org.mapsforge.map.reader; import org.mapsforge.core.model.*; import org.mapsforge.map.datastore.*; public class MapFile extends MapDataStore { public MapFile(java.io.File f){} public BoundingBox boundingBox(){return null;} public LatLong startPosition(){return null;} public MapReadResult readMapData(Tile t){return null;} public void close(){} }

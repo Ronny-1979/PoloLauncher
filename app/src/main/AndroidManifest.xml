@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <package android:name="android.microntek.canbus" />
+        <package android:name="com.thf.dabplayer" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="de.ronny.polocan" />
+        <package android:name="de.ronny.polocan.debug" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Polo Launcher"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false">
+
+        <service android:name=".RangeTrackingService"
+            android:exported="false" android:stopWithTask="false" />
+
+        <service
+            android:name=".DabNotificationListener"
+            android:label="Polo Launcher DAB Medienzugriff"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".DiagnosticsActivity"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity android:name=".SkinSettingsActivity"
+            android:screenOrientation="landscape" android:exported="false" />
+
+        <activity android:name=".MapSettingsActivity"
+            android:screenOrientation="landscape" android:exported="false" />
+
+        <activity android:name=".RangeSettingsActivity"
+            android:screenOrientation="landscape" android:exported="false" />
+        <activity android:name=".Obd2SettingsActivity"
+            android:screenOrientation="landscape" android:exported="false" />
+
+        <activity
+            android:name=".OfflineMapsActivity"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:screenOrientation="landscape"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

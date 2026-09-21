@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'de.ronny.pololauncher'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'de.ronny.pololauncher'
+        minSdk 26
+        targetSdk 33
+        // The radio is ARM: without a filter MapLibre ships four native ABIs (x86 included).
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+        versionCode 65
+        versionName '0.30.4'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    // Optional OpenFreeMap vector renderer; Mapsforge remains the offline/fallback engine.
+    implementation 'org.maplibre.gl:android-sdk:11.8.0'
+    def mapsforgeVersion = '0.30.0'
+    implementation "com.github.mapsforge.mapsforge:mapsforge-core:${mapsforgeVersion}@jar"
+    implementation "com.github.mapsforge.mapsforge:mapsforge-map:${mapsforgeVersion}@jar"
+    implementation "com.github.mapsforge.mapsforge:mapsforge-map-reader:${mapsforgeVersion}@jar"
+    implementation "com.github.mapsforge.mapsforge:mapsforge-themes:${mapsforgeVersion}@jar"
+    implementation "com.github.mapsforge.mapsforge:mapsforge-map-android:${mapsforgeVersion}@jar"
+    implementation 'com.caverock:androidsvg:1.4'
+}

@@ -1,0 +1,1 @@
+package org.mapsforge.map.datastore; import org.mapsforge.core.model.*; public abstract class MapDataStore { public abstract BoundingBox boundingBox(); public abstract LatLong startPosition(); public abstract void close(); }

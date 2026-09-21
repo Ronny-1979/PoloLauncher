@@ -1,0 +1,1 @@
+package org.mapsforge.map.android.graphics; public class AndroidGraphicFactory implements org.mapsforge.core.graphics.GraphicFactory { public static AndroidGraphicFactory INSTANCE; public static void createInstance(android.content.Context c){} }
