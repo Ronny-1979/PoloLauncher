@@ -28,8 +28,25 @@ jobs:
         id: ver
         run: echo "v=$(grep -oP "versionName '\K[^']+" app/build.gradle)" >> "$GITHUB_OUTPUT"
 
+      # Android aktualisiert eine installierte App nur, wenn Paketname UND Signatur gleich sind.
+      # Ohne dein eigenes Debug-Zertifikat würde GitHub einen Zufallsschlüssel erzeugen.
+      - name: Eigenen Debug-Schlüssel einsetzen
+        env:
+          KS: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            mkdir -p ~/.android
+            echo "$KS" | base64 -d > ~/.android/debug.keystore
+            echo "Eigener Debug-Schlüssel aktiv"
+          else
+            echo "::warning::Secret DEBUG_KEYSTORE_BASE64 fehlt: Zufallsschlüssel, die APK kann die bestehende App NICHT aktualisieren."
+          fi
+
       - name: APK bauen
         run: sh gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Signatur-Fingerabdruck (zum Vergleich mit deinem Schlüssel)
+        run: keytool -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk | grep -E "Owner|SHA256"
 
       - name: APK umbenennen
         run: cp app/build/outputs/apk/debug/app-debug.apk "PoloLauncher_v${{ steps.ver.outputs.v }}_debug.apk"
@@ -50,7 +67,7 @@ jobs:
           else
             gh release create "v${V}" "$FILE" --target "${GITHUB_SHA}" \
               --title "PoloLauncher v${V}" \
-              --notes "Debug-APK (Paket de.ronny.pololauncher.debug). Änderungen siehe README und TESTBERICHT_v${V}.md."
+              --notes "Debug-APK. Aktualisiert eine bestehende Installation nur, wenn Paketname und Signatur übereinstimmen (Secret DEBUG_KEYSTORE_BASE64). Änderungen siehe README und TESTBERICHT_v${V}.md."
           fi
 
       # Nur zur Information: ein Fehlschlag hier verhindert die APK nicht.
