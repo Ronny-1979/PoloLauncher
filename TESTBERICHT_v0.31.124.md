@@ -1,0 +1,78 @@
+# Testbericht v0.31.124 (wöchentliche Karten-Update-Prüfung mit Popup)
+
+Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
+
+
+## Nachtrag v0.31.105
+- OBD2: Timeout-Toleranz (pollRead), Such-Timeout 10 s, Support-Check ohne Verbindungsabbruch; RpmFrozenTest um „Auto fährt“ erweitert. Gesamte Testsuite grün.
+
+## Nachtrag v0.31.105
+- Drehzahl 0 bei verstummtem CAN im Stillstand; Testsuite grün.
+
+## Nachtrag v0.31.105
+- Diagnose-Log RPM-Verlauf im Stillstand; Testsuite grün.
+
+## Nachtrag v0.31.105
+- Aufräumen toter Code; SourceAuditTest-Prüfung der ungenutzten Wetterkachel-Ausrichtung entfernt; Tests von CompletionListeners/LoadTimeoutGate entfernt. Testsuite grün.
+
+## Nachtrag v0.31.105
+- Zweite Aufräumrunde (exakte Referenzanalyse); `tests/run-tests.sh` grün; `tests/compile-check.sh` gegen android-33: 108 Klassen, 0 Fehler.
+
+## Nachtrag v0.31.106
+- „Ø seit Tanken“ vollständig entfernt (Klasse, Diagnose, Knopf, Feld `avgConsumption`, Refill-Hook); Tests entsprechend angepasst bzw. entfernt (Obd2RefuelAveragerTest). Duplikate zusammengelegt (TrafficDataStore.Window, HttpText, DabNotificationListener.accessGranted). `run-tests.sh` grün; `compile-check.sh` gegen android-33 ohne Fehler. Nicht am Radio getestet.
+
+## Nachtrag v0.31.107
+- Ungenutzte Abhängigkeit androidsvg aus build.gradle entfernt (kein Import im gesamten Code). Tests grün.
+
+## Nachtrag v0.31.108
+- Glas-Weichzeichnung beim Appstart im Hintergrund vorbereitet; UI-Wächter meldet keinen Leerlauf (nativePollOnce) mehr. Tests und compile-check grün.
+
+## Nachtrag v0.31.109
+- Diagnose um GPS-Abstände und Karten-Bilder/Stillstand beim Gleiten erweitert (MapFollowDiagnostics, OnCameraMoveListener). Tests und compile-check grün.
+
+## Nachtrag v0.31.110
+- Diagnose: zählt Fixes in Fahrt, bei denen die Kamera schon stillstand, mit Ereigniszeile. Tests und compile-check grün.
+
+## Nachtrag v0.31.111
+- Jitter-Filter der Folgekamera nur noch im Stand/Schleichfahrt (CameraMotion.isJitter), Tests ergänzt. Tests und compile-check grün.
+
+## Nachtrag v0.31.112
+- OBD2: Verbindungs-Watchdog (20 s), nicht blockierendes Schließen, Adapter-Neustart bei 45 s ohne Daten (Backoff bis 300 s), Neuverbinden beim Standby-Aufwachen. Tests und compile-check grün.
+
+## Nachtrag v0.31.113
+- Adapter-Neustart bei leeren Daten nach 30 s statt 45 s. Tests und compile-check grün.
+
+## Nachtrag v0.31.114
+- GPS-Taste und Info-Taste auf der Karte ohne Hintergrund (mit leichtem Textschatten); Netztyp zeigt 4G statt LTE. Tests und compile-check grün.
+
+## Nachtrag v0.31.115
+- Fahrzeugkachel nach Konzept B: Tempo/Drehzahl groß, Aktuell/Ø 100 KM darunter, Bordnetz/Außen klein in der Kopfzeile, Gurt/Wasser immer sichtbar. Tests und compile-check siehe unten.
+
+## Nachtrag v0.31.116
+- DAB-Senderlogo wird mit abgerundeten Ecken beschnitten (RoundedArtworkView). Tests und compile-check grün.
+
+## Nachtrag v0.31.117
+- Blinkende orange Gurt-Warnung auf der Karte (SeatbeltAlert + SeatbeltAlertTest). Tests und compile-check grün.
+
+## Nachtrag v0.31.118
+- Tempo, Drehzahl, Aktuell, Ø 100 KM: Beschriftung und Wert mittig in der Kachel. Tests und compile-check grün.
+
+## Nachtrag v0.31.119
+- DAB-Autostart: Rückkehr erst, wenn DABdream+ vorn ist und der Sender läuft (DabReturnGate). CarPlay-Rückkehr wartet auf Verbindungssignale (Bluetooth/CarPlay-Medien, CarPlayConnection) mit Zeitlimit 90 s. Tests und compile-check grün.
+
+## Nachtrag v0.31.120
+- Letzter Kartenzustand (Position, Fahrtrichtung, Zoom, Ortslage) wird alle 5 s, bei Bildschirm-aus und beim Pausieren gespeichert und beim Start wiederhergestellt. Tests und compile-check grün.
+
+## Nachtrag v0.31.121
+- Unbekannte Ortslage überschreibt die gespeicherte nicht mehr; ohne erkannte Ortslage/Geschwindigkeit bleibt der zuletzt genutzte Zoom. Tests und compile-check grün.
+
+## Nachtrag v0.31.122
+- Einheit bei Aktuell/Ø 100 KM größer (UnitValueView mit eigenem Maßstab); im Schiebebetrieb (l/100 km unter 0,05) zeigt Aktuell l/h (ConsumptionDisplayTest erweitert). Tests und compile-check grün.
+
+## Nachtrag v0.31.123
+- Automatische Prüfung auf neue Karten einmal pro Woche (MapUpdateSchedule + MapUpdateScheduleTest), Popup im Launcher mit Aktualisieren/Später. Tests und compile-check grün.
+
+## Nachtrag v0.31.124
+- UsbImportLayoutTest, SourceAuditTest und Compile-Check grün.
+- Windows-Downloader (mcs, .NET 4.5) gegen lokalen HTTP-Server getestet: Download, HEAD/Last-Modified, Überspringen fertiger Dateien, Fortsetzen per Range, byte-identisch. GUI nur kompiliert, nicht auf Windows gestartet.
+- Nicht auf dem Radio getestet (Stick-Erkennung, ggf. SAF-Ordnerauswahl).

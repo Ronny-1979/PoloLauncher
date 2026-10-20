@@ -27,6 +27,15 @@ public final class Obd2ConsumptionAveragerTest {
         Obd2ConsumptionAverager steady = new Obd2ConsumptionAverager();
         for (int i = 0; i < 3600; i++) steady.add(6.0, 100.0, 1.0);
         eq(6.0d, steady.value(), 1e-6, "Steady 6 l/h at 100 km/h converges to 6 l/100km");
+        eq(100d, steady.weightedKm(), 1e-6, "Rolling window reaches exactly 100 km");
+
+        // A rolling window changes immediately: 25 new km at 10 l/100km replace the oldest
+        // 25 km of the previous 6 l/100km section. It never waits for a new 100-km block.
+        for (int i = 0; i < 900; i++) steady.add(10.0, 100.0, 1.0);
+        eq(7.0d, steady.value(), 1e-6, "Newest 25 km continuously replace oldest 25 km");
+        eq(100d, steady.weightedKm(), 1e-6, "Window never grows beyond 100 km");
+        for (int i = 0; i < 2700; i++) steady.add(10.0, 100.0, 1.0);
+        eq(10.0d, steady.value(), 1e-6, "A complete new 100 km fully replaces old driving");
 
         // A stationary idle period (0 km/h) must not corrupt the distance-weighted average:
         // no distance travelled, so it must not count toward the l/100km figure at all.
@@ -39,6 +48,9 @@ public final class Obd2ConsumptionAveragerTest {
         double afterIdle = idleThenDrive.value();
         boolean atLeastBaseline = afterIdle >= 6.0d - 1e-6;
         if (!atLeastBaseline) throw new AssertionError("Idle fuel must raise, never lower, the average: " + afterIdle);
+        for (int i = 0; i < 18; i++) idleThenDrive.add(6.0, 100.0, 1.0); // next 0.5 km
+        eq(6.0d, idleThenDrive.value(), 1e-6,
+                "Old idle fuel leaves the rolling window together with its driving bucket");
 
         // Implausible/garbage samples must be ignored rather than corrupting the average.
         Obd2ConsumptionAverager guarded = new Obd2ConsumptionAverager();
@@ -58,7 +70,7 @@ public final class Obd2ConsumptionAveragerTest {
         resettable.reset();
         nan(resettable.value(), "Reset clears the accumulated average");
 
-        // Persistence round-trip (Obd2Client saves/restores exactly these two numbers).
+        // Persistence round-trip retains the individual rolling-window buckets.
         Obd2ConsumptionAverager beforeRestart = new Obd2ConsumptionAverager();
         for (int i = 0; i < 1800; i++) beforeRestart.add(6.0, 100.0, 1.0); // half an hour driving
         double savedLiters = beforeRestart.weightedLiters();
@@ -67,13 +79,19 @@ public final class Obd2ConsumptionAveragerTest {
 
         Obd2ConsumptionAverager afterRestart = new Obd2ConsumptionAverager();
         nan(afterRestart.value(), "Fresh instance has no value before restore");
-        afterRestart.restore(savedLiters, savedKm);
+        if (!afterRestart.restoreSnapshot(beforeRestart.snapshot()))
+            throw new AssertionError("Valid rolling snapshot must restore");
         eq(6.0d, afterRestart.value(), 1e-6, "Restored instance reproduces the same average");
         // Continuing to drive after restore must accumulate onto the restored total, not
         // start over - this is the whole point of persisting across restarts.
         for (int i = 0; i < 1800; i++) afterRestart.add(6.0, 100.0, 1.0);
         eq(2.0d * savedKm, afterRestart.weightedKm(), 1e-6, "Distance accumulates onto the restored total");
         eq(6.0d, afterRestart.value(), 1e-6, "Average stays correct after resuming past a restore");
+
+        String beforeCorruption = afterRestart.snapshot();
+        if (afterRestart.restoreSnapshot("v1|broken")) throw new AssertionError("Corrupt snapshot accepted");
+        if (!beforeCorruption.equals(afterRestart.snapshot()))
+            throw new AssertionError("Corrupt snapshot changed live window");
 
         // Invalid/corrupt persisted data must not be applied (start fresh instead of crashing
         // or producing a bogus average from garbage SharedPreferences content).
@@ -84,6 +102,7 @@ public final class Obd2ConsumptionAveragerTest {
         nan(guardedRestore.value(), "Negative saved km rejected, not applied");
         guardedRestore.restore(50.0, 1000.0);
         eq(5.0d, guardedRestore.value(), 1e-6, "Valid restore still works after rejected attempts");
+        eq(100d, guardedRestore.weightedKm(), 1e-6, "Legacy cumulative distance migrates into 100-km seed");
 
         System.out.println("Obd2ConsumptionAveragerTest: all cases passed");
     }

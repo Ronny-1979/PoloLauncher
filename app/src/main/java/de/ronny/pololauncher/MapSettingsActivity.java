@@ -15,92 +15,113 @@ import android.widget.TextView;
 
 /** Compact map configuration. All values are persisted immediately. */
 public final class MapSettingsActivity extends Activity {
-    private TextView activeStyle;
-    private TextView currentZoom;
+    private TextView activeColorMode;
     private TextView settlementZoomText;
     private TextView outsideZoomText;
-    private TextView autoHint;
     private TextView offlineStatus;
-    private SeekBar zoomBar;
+    private SeekBar tiltBar;
+    private SeekBar heightBar;
+    private TextView tiltText;
+    private TextView heightText;
+    private static final int TILT_STEP = 5;
     private SeekBar settlementZoomBar;
     private SeekBar outsideZoomBar;
-    private Switch roadSnap;
-    private TextView roadSnapHint;
+    private Switch directBoundaryZoom;
+    private Switch speedCameraAlerts;
+    private TextView speedCameraHint;
+    private RadioGroup colorModes;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        CopperSkin.apply(this);
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackground(CopperSkin.background());
+        scroll.setBackground(GlassSkin.background(this));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(25), dp(18), dp(25), dp(24));
         scroll.addView(root);
 
-        root.addView(text("KARTE", 26, CopperSkin.CREAM, true), new LinearLayout.LayoutParams(-1, dp(48)));
+        root.addView(text("KARTE", 26, GlassSkin.TEXT, true), new LinearLayout.LayoutParams(-1, dp(48)));
 
-        section(root, "ONLINE-KARTENSTIL");
-        activeStyle = text("", 16, CopperSkin.GREEN, true);
-        root.addView(activeStyle, new LinearLayout.LayoutParams(-1, dp(34)));
-        RadioGroup styles = new RadioGroup(this);
-        styles.setOrientation(RadioGroup.HORIZONTAL);
-        addStyle(styles, "Liberty", "liberty");
-        addStyle(styles, "Bright", "bright");
-        addStyle(styles, "3D", "3d");
-        root.addView(styles, new LinearLayout.LayoutParams(-1, dp(52)));
-        root.addView(hint("3D zeigt geneigte Vektorkarten und kartierte Gebäude. Bei Ruckeln Liberty oder Bright wählen."));
-        refreshStyle();
+        section(root, "3D-ANSICHT");
+        tiltText = text("", 18, GlassSkin.ACCENT, true);
+        root.addView(tiltText, new LinearLayout.LayoutParams(-1, dp(34)));
+        tiltBar = new SeekBar(this);
+        tiltBar.setMax(MapPreferences.MAX_TILT / TILT_STEP);
+        tiltBar.setProgress(MapPreferences.tilt(this) / TILT_STEP);
+        tiltBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                int value = progress * TILT_STEP;
+                tiltText.setText(tiltLabel(value));
+                if (fromUser) MapPreferences.setTilt(MapSettingsActivity.this, value);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        root.addView(tiltBar, new LinearLayout.LayoutParams(-1, dp(45)));
+        tiltText.setText(tiltLabel(MapPreferences.tilt(this)));
+        heightText = text("", 18, GlassSkin.ACCENT, true);
+        root.addView(heightText, new LinearLayout.LayoutParams(-1, dp(34)));
+        heightBar = new SeekBar(this);
+        heightBar.setMax(MapPreferences.MAX_BUILDING_HEIGHT);
+        heightBar.setProgress(MapPreferences.buildingHeight(this));
+        heightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                heightText.setText(heightLabel(progress));
+                if (fromUser) MapPreferences.setBuildingHeight(MapSettingsActivity.this, progress);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        root.addView(heightBar, new LinearLayout.LayoutParams(-1, dp(45)));
+        heightText.setText(heightLabel(MapPreferences.buildingHeight(this)));
+        root.addView(hint("Neigung: 0° = Karte von oben, 45° ist der Standard. Gebäudehöhe: Die Offline-Daten kennen keine echten Höhen, alle Gebäude werden gleich hoch gezeichnet (0 = flach). Gebäude erscheinen ab Zoom 14. Änderungen gelten, sobald du zur Hauptseite zurückkehrst."));
+        addButton(root, "3D-Werte auf Standard zurücksetzen", () -> {
+            MapPreferences.setTilt(this, MapPreferences.DEFAULT_TILT);
+            MapPreferences.setBuildingHeight(this, MapPreferences.DEFAULT_BUILDING_HEIGHT);
+            tiltBar.setProgress(MapPreferences.DEFAULT_TILT / TILT_STEP);
+            heightBar.setProgress(MapPreferences.DEFAULT_BUILDING_HEIGHT);
+        });
+
+        section(root, "KARTENMODUS");
+        activeColorMode = text("", 16, GlassSkin.GREEN, true);
+        root.addView(activeColorMode, new LinearLayout.LayoutParams(-1, dp(34)));
+        colorModes = new RadioGroup(this);
+        colorModes.setOrientation(RadioGroup.HORIZONTAL);
+        addColorMode(colorModes, "Automatisch", MapPreferences.COLOR_AUTO);
+        addColorMode(colorModes, "Tag", MapPreferences.COLOR_DAY);
+        addColorMode(colorModes, "Nacht", MapPreferences.COLOR_NIGHT);
+        root.addView(colorModes, new LinearLayout.LayoutParams(-1, dp(52)));
+        root.addView(hint("Automatisch schaltet mit Sonnenaufgang und Sonnenuntergang an der GPS-Position. Wirkt auf die Karte."));
+        refreshColorMode();
 
         section(root, "FAHRTRICHTUNG");
         Switch heading = toggle("Fahrtrichtung oben", MapPreferences.headingUp(this));
         heading.setOnCheckedChangeListener((button, enabled) -> MapPreferences.setHeadingUp(this, enabled));
         root.addView(heading, new LinearLayout.LayoutParams(-1, dp(56)));
-        root.addView(hint("Wirkt auf Online- und Offline-Karte. Ohne brauchbaren GPS-Kurs bleibt Norden oben."));
+        root.addView(hint("Wirkt auf die Karte. Ohne brauchbaren GPS-Kurs bleibt Norden oben."));
 
-        section(root, "GPS-POSITION – TEST");
-        boolean roadDataAvailable = OfflineMapStore.selectedFile(this) != null;
-        roadSnap = toggle("Punkt auf Straße einrasten", MapPreferences.roadSnap(this));
-        roadSnap.setEnabled(roadDataAvailable);
-        roadSnap.setAlpha(roadDataAvailable ? 1f : 0.45f);
-        roadSnap.setOnCheckedChangeListener((button, enabled) -> MapPreferences.setRoadSnap(this, enabled));
-        root.addView(roadSnap, new LinearLayout.LayoutParams(-1, dp(56)));
-        roadSnapHint = hint(roadDataAvailable
-                ? "Testmodus für Online- und Offline-Karte. Nutzt Abstand, Fahrtrichtung und Straßen der Offline-Region."
-                : "Für den Testmodus muss zuerst eine Offline-Region heruntergeladen und ausgewählt werden.");
-        root.addView(roadSnapHint);
+        section(root, "VERKEHRSWARNUNGEN");
+        speedCameraAlerts = toggle("Feste Blitzer aus Offline-Karte anzeigen",
+                MapPreferences.speedCameraAlerts(this));
+        speedCameraAlerts.setOnCheckedChangeListener((button, enabled) ->
+                MapPreferences.setSpeedCameraAlerts(this, enabled));
+        root.addView(speedCameraAlerts, new LinearLayout.LayoutParams(-1, dp(56)));
+        speedCameraHint = hint(speedCameraHintText());
+        root.addView(speedCameraHint);
 
         section(root, "ZOOM");
-        currentZoom = text("", 20, CopperSkin.GOLD, true);
-        root.addView(currentZoom, new LinearLayout.LayoutParams(-1, dp(38)));
-        zoomBar = new SeekBar(this);
-        zoomBar.setMax(MapPreferences.MAX_ZOOM - MapPreferences.MIN_ZOOM);
-        zoomBar.setProgress(MapPreferences.zoom(this) - MapPreferences.MIN_ZOOM);
-        zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                int value = MapPreferences.MIN_ZOOM + progress;
-                currentZoom.setText("Grundzoom / noch nicht erkannt: " + value);
-                if (fromUser) MapPreferences.setZoom(MapSettingsActivity.this, value);
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) {}
-            @Override public void onStopTrackingTouch(SeekBar bar) {}
-        });
-        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(52)));
-        currentZoom.setText("Grundzoom / noch nicht erkannt: " + MapPreferences.zoom(this));
-        root.addView(hint("Solange noch kein Gebiet erkannt wurde, gilt bei GPS-Nachführung mindestens Zoom 12."));
+        root.addView(hint("Der Zoom richtet sich automatisch nach dem Ort: Innerorts und Außerorts werden an der GPS-Position erkannt (mit Vorausschau, schnellem Ortseingang und geglättetem Herauszoomen). Bis das Gebiet erkannt ist, gilt Zoom 16."));
 
-        Switch automatic = toggle("Ortsabhängigen Zoom verwenden", MapPreferences.autoZoom(this));
-        LinearLayout.LayoutParams automaticParams = new LinearLayout.LayoutParams(-1, dp(56));
-        automaticParams.topMargin = dp(8);
-        root.addView(automatic, automaticParams);
-        autoHint = hint("");
-        root.addView(autoHint);
-        automatic.setOnCheckedChangeListener((button, enabled) -> {
-            MapPreferences.setAutoZoom(this, enabled);
-            refreshAutoHint(enabled);
-            refreshZoomControls(enabled);
-        });
+        directBoundaryZoom = toggle("Direkt an Ortsgrenze umschalten",
+                MapPreferences.directBoundaryZoom(this));
+        directBoundaryZoom.setOnCheckedChangeListener((button, enabled) ->
+                MapPreferences.setDirectBoundaryZoom(this, enabled));
+        root.addView(directBoundaryZoom, new LinearLayout.LayoutParams(-1, dp(56)));
+        root.addView(hint("Beide Modi schauen in Fahrtrichtung voraus und schalten beim Einfahren schnell auf Innerorts. "
+                + "Stabil hält Innerorts bei OSM-Lücken besonders konsequent und zoomt erst nach mehreren klaren Außerorts-Treffern wieder heraus. "
+                + "Direkt reagiert beim tatsächlichen Verlassen etwas früher."));
 
-        settlementZoomText = text("Innerorts: " + MapPreferences.settlementZoom(this), 18, CopperSkin.GOLD, true);
+        settlementZoomText = text("Innerorts: " + MapPreferences.settlementZoom(this), 18, GlassSkin.ACCENT, true);
         root.addView(settlementZoomText, new LinearLayout.LayoutParams(-1, dp(34)));
         settlementZoomBar = new SeekBar(this);
         settlementZoomBar.setMax(MapPreferences.MAX_ZOOM - MapPreferences.FOLLOW_MIN_ZOOM);
@@ -116,7 +137,7 @@ public final class MapSettingsActivity extends Activity {
         });
         root.addView(settlementZoomBar, new LinearLayout.LayoutParams(-1, dp(45)));
 
-        outsideZoomText = text("Außerorts: " + MapPreferences.outsideZoom(this), 18, CopperSkin.GOLD, true);
+        outsideZoomText = text("Außerorts: " + MapPreferences.outsideZoom(this), 18, GlassSkin.ACCENT, true);
         root.addView(outsideZoomText, new LinearLayout.LayoutParams(-1, dp(34)));
         outsideZoomBar = new SeekBar(this);
         outsideZoomBar.setMax(MapPreferences.MAX_ZOOM - MapPreferences.FOLLOW_MIN_ZOOM);
@@ -133,22 +154,19 @@ public final class MapSettingsActivity extends Activity {
         root.addView(outsideZoomBar, new LinearLayout.LayoutParams(-1, dp(45)));
 
         addButton(root, "Zoomwerte auf Standard zurücksetzen", () -> {
-            MapPreferences.setZoom(this, 15);
+            MapPreferences.setZoom(this, MapPreferences.DEFAULT_ZOOM);
             MapPreferences.setSettlementZoom(this, MapPreferences.DEFAULT_SETTLEMENT_ZOOM);
             MapPreferences.setOutsideZoom(this, MapPreferences.DEFAULT_OUTSIDE_ZOOM);
-            zoomBar.setProgress(15 - MapPreferences.MIN_ZOOM);
             settlementZoomBar.setProgress(MapPreferences.DEFAULT_SETTLEMENT_ZOOM - MapPreferences.FOLLOW_MIN_ZOOM);
             outsideZoomBar.setProgress(MapPreferences.DEFAULT_OUTSIDE_ZOOM - MapPreferences.FOLLOW_MIN_ZOOM);
         });
-        refreshAutoHint(automatic.isChecked());
-        refreshZoomControls(automatic.isChecked());
 
         section(root, "OFFLINE-KARTE");
-        offlineStatus = text(selectedRegionText(), 16,
-                OfflineMapStore.selectedFile(this) == null ? 0xffffa06b : CopperSkin.GREEN, true);
+        offlineStatus = text(offlineStatusText(), 16,
+                GermanyOfflineStore.ready(this) ? GlassSkin.GREEN : 0xffffa06b, true);
         root.addView(offlineStatus, new LinearLayout.LayoutParams(-1, dp(38)));
-        addButton(root, "Offline-Karten verwalten", () -> startActivity(new Intent(this, OfflineMapsActivity.class)));
-        root.addView(hint("Online-Karten werden zwischengespeichert. Eine vollständige Region für Fahrten ohne Internet muss separat heruntergeladen werden."));
+        addButton(root, "Offline-Karte Deutschland verwalten", () -> startActivity(new Intent(this, OfflineMapsActivity.class)));
+        root.addView(hint("Die Offline-Karte Deutschland enthält die Basiskarte, alle Straßen zum Einrasten des Standortpunkts sowie Tempolimits und feste Blitzer. Symbole für Orte (Gaststätten, Tankstellen …) erscheinen ab Zoom 14."));
 
         addButton(root, "Zurück", this::finish);
         setContentView(scroll);
@@ -156,98 +174,97 @@ public final class MapSettingsActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        refreshAutoHint(MapPreferences.autoZoom(this));
-        if (roadSnap != null) {
-            boolean available = OfflineMapStore.selectedFile(this) != null;
-            roadSnap.setEnabled(available);
-            roadSnap.setAlpha(available ? 1f : 0.45f);
-            roadSnapHint.setText(available
-                    ? "Testmodus für Online- und Offline-Karte. Nutzt Abstand, Fahrtrichtung und Straßen der Offline-Region."
-                    : "Für den Testmodus muss zuerst eine Offline-Region heruntergeladen und ausgewählt werden.");
+        refreshColorMode();
+        if (directBoundaryZoom != null) {
+            directBoundaryZoom.setChecked(MapPreferences.directBoundaryZoom(this));
+        }
+        if (speedCameraAlerts != null) {
+            speedCameraAlerts.setChecked(MapPreferences.speedCameraAlerts(this));
+            if (speedCameraHint != null) speedCameraHint.setText(speedCameraHintText());
         }
         if (offlineStatus != null) {
-            offlineStatus.setText(selectedRegionText());
-            offlineStatus.setTextColor(OfflineMapStore.selectedFile(this) == null ? 0xffffa06b : CopperSkin.GREEN);
+            offlineStatus.setText(offlineStatusText());
+            offlineStatus.setTextColor(GermanyOfflineStore.ready(this) ? GlassSkin.GREEN : 0xffffa06b);
         }
     }
 
-    private void refreshStyle() {
-        if (activeStyle == null) return;
-        String key = MapPreferences.vectorStyle(this);
-        String name = "3d".equals(key) ? "3D" : "bright".equals(key) ? "Bright" : "Liberty";
-        activeStyle.setText("Aktiver Stil: " + name);
+    private void refreshColorMode() {
+        if (activeColorMode == null) return;
+        String mode = MapPreferences.colorMode(this);
+        String name = MapPreferences.COLOR_DAY.equals(mode) ? "Immer Tag"
+                : MapPreferences.COLOR_NIGHT.equals(mode) ? "Immer Nacht"
+                : "Automatisch nach Sonnenstand";
+        activeColorMode.setText("Aktiver Modus: " + name);
+        syncRadioSelection(colorModes, mode);
     }
 
-    private void refreshAutoHint(boolean enabled) {
-        if (autoHint == null) return;
-        if (enabled && OfflineMapStore.selectedFile(this) == null) {
-            autoHint.setText("⚠ Automatischer Zoom benötigt eine installierte und ausgewählte Offline-Region.");
-            autoHint.setTextColor(0xffffa06b);
-        } else {
-            autoHint.setText(enabled
-                    ? "Automatischer Zoom ist aktiv und nutzt die Ortsflächen der Offline-Region."
-                    : "Ausgeschaltet: Die eingestellte Zoomstufe bleibt der feste Ausgangswert.");
-            autoHint.setTextColor(CopperSkin.MUTED);
-        }
+    private String speedCameraHintText() {
+        if (!GermanyOfflineStore.ready(this))
+            return "Standardmäßig aus. Benötigt die Offline-Karte Deutschland; ohne Offline-Daten werden keine Blitzer angezeigt.";
+        return "Nutzt feste OSM-Blitzer aus dem Deutschland-Paket. Ein bestätigter Treffer erscheint oben links mit Entfernung und wird im Diagnose-Log protokolliert. Daten können fehlen oder veraltet sein; Rechtslage beachten.";
     }
 
-    private void refreshZoomControls(boolean enabled) {
-        if (settlementZoomBar == null || outsideZoomBar == null) return;
-        settlementZoomBar.setEnabled(enabled);
-        outsideZoomBar.setEnabled(enabled);
-        float alpha = enabled ? 1f : 0.45f;
-        settlementZoomBar.setAlpha(alpha);
-        outsideZoomBar.setAlpha(alpha);
-        settlementZoomText.setAlpha(alpha);
-        outsideZoomText.setAlpha(alpha);
+    private String offlineStatusText() {
+        if (GermanyOfflineStore.ready(this)) return "✓ Offline-Karte Deutschland bereit";
+        GermanyOfflineStore.Status s = GermanyOfflineStore.status(this);
+        if (s.active) return "Deutschland wird aufgebaut: " + s.detail;
+        return "Offline-Karte Deutschland noch nicht installiert";
     }
 
-    private String selectedRegionText() {
-        int index = OfflineMapStore.indexOf(OfflineMapStore.selected(this));
-        return index >= 0 && OfflineMapStore.selectedFile(this) != null
-                ? "Aktive Region: " + OfflineMapStore.NAMES[index] : "Keine Offline-Region ausgewählt";
-    }
-
-    private void addStyle(RadioGroup group, String title, String key) {
+    private void addColorMode(RadioGroup group, String title, String key) {
         RadioButton option = new RadioButton(this);
+        option.setId(android.view.View.generateViewId());
+        option.setTag(key);
         option.setText(title);
-        option.setTextColor(CopperSkin.CREAM);
+        option.setTextColor(GlassSkin.TEXT);
         option.setTextSize(16);
-        option.setChecked(key.equals(MapPreferences.vectorStyle(this)));
         option.setPadding(0, 0, dp(14), 0);
         option.setOnClickListener(v -> {
-            MapPreferences.setVectorStyle(this, key);
-            refreshStyle();
+            MapPreferences.setColorMode(this, key);
+            refreshColorMode();
         });
         group.addView(option);
+    }
+
+    /** Keeps every RadioGroup in sync with its persisted value immediately. */
+    private static void syncRadioSelection(RadioGroup group, String selectedKey) {
+        if (group == null) return;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            android.view.View child = group.getChildAt(i);
+            if (child instanceof RadioButton && selectedKey.equals(child.getTag())) {
+                group.check(child.getId());
+                return;
+            }
+        }
+        group.clearCheck();
     }
 
     private Switch toggle(String title, boolean checked) {
         Switch toggle = new Switch(this);
         toggle.setText(title);
         toggle.setTextSize(17);
-        toggle.setTextColor(CopperSkin.CREAM);
+        toggle.setTextColor(GlassSkin.TEXT);
         toggle.setChecked(checked);
         return toggle;
     }
 
     private void section(LinearLayout root, String title) {
-        TextView heading = text(title, 18, CopperSkin.GOLD, true);
+        TextView heading = text(title, 18, GlassSkin.ACCENT, true);
         heading.setPadding(0, dp(15), 0, 0);
         root.addView(heading, new LinearLayout.LayoutParams(-1, dp(48)));
     }
 
     private TextView hint(String value) {
-        TextView view = text(value, 14, CopperSkin.MUTED, false);
+        TextView view = text(value, 14, GlassSkin.MUTED, false);
         view.setPadding(0, dp(3), 0, dp(6));
         return view;
     }
 
     private void addButton(LinearLayout root, String title, Runnable action) {
-        TextView button = text(title, 16, CopperSkin.CREAM, true);
+        TextView button = text(title, 16, GlassSkin.TEXT, true);
         button.setGravity(Gravity.CENTER_VERTICAL);
         button.setPadding(dp(16), 0, dp(16), 0);
-        button.setBackground(CopperSkin.touch(this, false));
+        button.setBackground(GlassSkin.touch(this, false));
         button.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
         params.topMargin = dp(9);
@@ -263,6 +280,14 @@ public final class MapSettingsActivity extends Activity {
         view.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
         view.setGravity(Gravity.CENTER_VERTICAL);
         return view;
+    }
+
+    private static String tiltLabel(int degrees) {
+        return "Neigung: " + degrees + "°" + (degrees == 0 ? " (von oben)" : degrees == MapPreferences.DEFAULT_TILT ? " (Standard)" : "");
+    }
+
+    private static String heightLabel(int metres) {
+        return "Gebäudehöhe: " + (metres == 0 ? "flach" : metres + " m") + (metres == MapPreferences.DEFAULT_BUILDING_HEIGHT ? " (Standard)" : "");
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

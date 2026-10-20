@@ -70,9 +70,18 @@ public final class HctOemAutoPoller {
                         if (!HctCanbusBinderRuntime.isConnected()) {
                             synchronized (HctOemAutoPoller.class) { waitingForBinder++; }
                         } else {
-                            if (now >= next2) { send(c, 2); next2 = now + MODE2_MS; }
-                            if (now >= next1) { send(c, 1); next1 = now + MODE1_MS; }
-                            if (now >= next3) { send(c, 3); next3 = now + MODE3_MS; }
+                            boolean send2, send1, send3;
+                            synchronized (HctOemAutoPoller.class) {
+                                send2 = enabled && now >= next2;
+                                send1 = enabled && now >= next1;
+                                send3 = enabled && now >= next3;
+                                if (send2) next2 = now + MODE2_MS;
+                                if (send1) next1 = now + MODE1_MS;
+                                if (send3) next3 = now + MODE3_MS;
+                            }
+                            if (send2) send(c, 2);
+                            if (send1) send(c, 1);
+                            if (send3) send(c, 3);
                         }
                     }
                 } catch (Throwable t) {
@@ -103,18 +112,7 @@ public final class HctOemAutoPoller {
         tick = null;
     }
 
-    public static synchronized void setEnabled(boolean value) {
-        enabled = value;
-        DiagLog.add("AUTO-OEM-POLL manuell: " + (value ? "AN" : "AUS"));
-        if (value) {
-            long now = SystemClock.uptimeMillis();
-            next1 = next2 = next3 = now;
-        }
-    }
-
     public static synchronized boolean isEnabled() { return enabled; }
-    public static synchronized long mode2Sent() { return sent2; }
-    public static synchronized long errors() { return errors; }
 
     public static synchronized String summary() {
         return String.format(Locale.GERMANY,

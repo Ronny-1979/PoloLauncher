@@ -11,7 +11,6 @@ import android.view.animation.DecelerateInterpolator;
 
 /** Small dependency-free horizontal pager tailored for the car launcher. */
 public final class PagedLauncherLayout extends ViewGroup {
-    public interface PageListener { void onPageChanged(int page); }
     public interface PageGestureListener {
         void onGestureStart();
         void onPageSwipe();
@@ -27,7 +26,6 @@ public final class PagedLauncherLayout extends ViewGroup {
     private int currentPage;
     private VelocityTracker velocity;
     private ValueAnimator animator;
-    private PageListener listener;
     private PageGestureListener gestureListener;
 
     public PagedLauncherLayout(Context context) { this(context, null); }
@@ -40,7 +38,6 @@ public final class PagedLauncherLayout extends ViewGroup {
         setClipToPadding(false);
     }
 
-    public void setPageListener(PageListener value) { listener = value; }
     public void setPageGestureListener(PageGestureListener value) { gestureListener = value; }
     public int getCurrentPage() { return currentPage; }
 
@@ -53,7 +50,6 @@ public final class PagedLauncherLayout extends ViewGroup {
         if (animator != null) animator.cancel();
         currentPage = target;
         scrollTo(currentPage * Math.max(0, getWidth()), 0);
-        if (listener != null) listener.onPageChanged(currentPage);
     }
 
     @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -181,8 +177,7 @@ public final class PagedLauncherLayout extends ViewGroup {
         animator.start();
         if (targetPage != currentPage) {
             currentPage = targetPage;
-            if (listener != null) listener.onPageChanged(currentPage);
-        }
+            }
     }
 
     private void recycleVelocity() {

@@ -1,0 +1,12 @@
+PoloLauncher Karten-Downloader (Windows)
+=========================================
+1. USB-Stick in den PC stecken.
+2. PoloMapsDownloader.exe starten (kein Installieren nötig, .NET Framework 4.5+ ist in Windows 10/11 dabei).
+   Windows-Warnung "Der PC wurde geschützt": "Weitere Informationen" -> "Trotzdem ausführen".
+3. Der Zielordner steht automatisch auf <Stick>:\PoloMaps. "Alles herunterladen" klicken.
+4. Fertig-Meldung abwarten, Stick sicher entfernen, ins Radio stecken.
+5. Im Launcher: Offline-Karten -> "Von USB-Stick importieren". Den Rest (Prüfen, Aufbauen) macht der Launcher.
+
+- Abbruch/Neustart: unfertige Dateien (.part) werden fortgesetzt, fertige übersprungen.
+- Datenmenge: mehrere GB, Stick mit genug Platz (am besten >= 32 GB, exFAT/NTFS wegen Dateien > 4 GB).
+- Neu bauen: mcs -target:winexe -r:System.Windows.Forms.dll -r:System.Drawing.dll -out:PoloMapsDownloader.exe MapDownloader.cs MainForm.cs

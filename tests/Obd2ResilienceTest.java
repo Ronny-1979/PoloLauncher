@@ -66,7 +66,7 @@ public final class Obd2ResilienceTest {
         Pipe stale = new Pipe();
         Obd2Client client = running(context, stale);
         stale.inject("SEARCHING...\r41 00 BE 3E B8 13\r\r>");
-        DiagLog.clear();
+        DiagLogReset.clear();
         round(client, context, 10_000);
         VehicleState live = VehicleRepository.snapshot();
         check(live.obdRpm == 3000 && live.obdSpeedKmh == 100, "Stale bytes drained; the very first round is already aligned: " + live.obdRpm);
@@ -99,26 +99,13 @@ public final class Obd2ResilienceTest {
         check(VehicleRepository.snapshot().obdFuelLitersPerHour > 0d, "Switched off: the raw model value is used");
         check(Obd2Client.dfcoEnabled(new Context()), "Fuel-cut estimation defaults to on");
 
-        // 4) The learned efficiency factor scales the modelled fuel.
-        Context c4 = new Context();
-        Pipe cruise = new Pipe();
-        Obd2Client plain = running(c4, cruise);
-        round(plain, c4, 50_000); round(plain, c4, 51_000);
-        double base = VehicleRepository.snapshot().obdFuelLitersPerHour;
-        Pipe cruise2 = new Pipe();
-        Obd2Client scaled = running(c4, cruise2);
-        set(scaled, "veScale", 0.8);
-        round(scaled, c4, 60_000); round(scaled, c4, 61_000);
-        double reduced = VehicleRepository.snapshot().obdFuelLitersPerHour;
-        check(Math.abs(reduced / base - 0.8) < 1e-9, "Fuel proportional to the efficiency factor: " + reduced / base);
-
-        // 5) Reconnect back-off 2, 4, 8, 16, 30, 30 s, reset by a new adapter address.
+        // 4) Reconnect back-off 2, 4, 8, 16, 30, 30 s, reset by a new adapter address.
         Obd2Client backoff = new Obd2Client();
         long[] expected = {2_000, 4_000, 8_000, 16_000, 30_000, 30_000};
         for (long e : expected) check((long) call(backoff, "nextReconnectDelay", new Class<?>[]{}) == e, "Back-off step " + e);
 
-        // 6) Identical failure messages are folded instead of flooding the 1200-line buffer.
-        DiagLog.clear();
+        // 5) Identical failure messages are folded instead of flooding the 1200-line buffer.
+        DiagLogReset.clear();
         Obd2Client noisy = new Obd2Client();
         for (int i = 0; i < 50; i++) {
             SystemClock.now = 100_000 + i * 2_000L; // 100 s in total
@@ -135,7 +122,7 @@ public final class Obd2ResilienceTest {
         android.bluetooth.BluetoothAdapter.adapter = new android.bluetooth.BluetoothAdapter() {
             @Override public android.bluetooth.BluetoothDevice getRemoteDevice(String address) { throw new NoSuchMethodError("simulated Error"); }
         };
-        DiagLog.clear();
+        DiagLogReset.clear();
         dying.start(c7);
         long deadline = System.nanoTime() + 5_000_000_000L;
         while (!DiagLog.text(50).contains("NoSuchMethodError") && System.nanoTime() < deadline) Thread.sleep(20);

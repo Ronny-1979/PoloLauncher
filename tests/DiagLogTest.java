@@ -13,13 +13,13 @@ public final class DiagLogTest {
     }
 
     public static void main(String[] args) {
-        DiagLog.clear();
+        DiagLogReset.clear();
         for (int i = 0; i < 1_500; i++) DiagLog.add("Meldung " + i);
         check(lines(DiagLog.text()) == 1_200, "Internal diagnostic ring remains bounded");
         check(lines(DiagLog.text(600)) == 600, "Visible diagnostic text is bounded independently");
         check(DiagLog.text(1).contains("Meldung 1499"), "Newest line remains first");
 
-        DiagLog.clear();
+        DiagLogReset.clear();
         DiagLog.add("x".repeat(2_000));
         String bounded = DiagLog.text();
         check(bounded.contains("[gekürzt]") && bounded.length() < 1_300,

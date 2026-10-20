@@ -1,1 +1,1 @@
-# v0.4.2: no shrinking. Kept for later release builds.
+# Release shrinking is currently disabled in build.gradle; keep rules here for future use.

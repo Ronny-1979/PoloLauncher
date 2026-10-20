@@ -1,7 +1,6 @@
 package de.ronny.pololauncher;
 
 import android.content.Context;
-import java.util.Set;
 
 /** Keeps the passive HCT receivers/services alive while dashboard/diagnostics are open. */
 public final class VendorRuntime {
@@ -32,12 +31,5 @@ public final class VendorRuntime {
         }
     }
 
-    public static synchronized void addActions(Context c, Set<String> actions) {
-        RECEIVER.addActions(c.getApplicationContext(), actions);
-    }
 
-    public static synchronized int actionCount() { return RECEIVER.actionCount(); }
-    public static synchronized String syncSummary() { return RECEIVER.syncSummary(); }
-    public static synchronized long syncPacketCount() { return RECEIVER.syncPacketCount(); }
-    public static synchronized int lastDoorMask() { return RECEIVER.lastDoorMask(); }
 }

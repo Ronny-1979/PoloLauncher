@@ -6,19 +6,29 @@ public final class ConsumptionDisplayTest {
         VehicleState s = new VehicleState();
         s.instConsumptionUpdatedAtMs = VehicleRepository.now();
         s.obdSpeedKmh = 0; s.obdRpm = 828; s.obdFuelLitersPerHour = 0.8;
-        s.avgConsumption = 7.8;
-        check("0,8 l".equals(ConsumptionDisplay.instantaneous(s)), "Running idle");
-        check("0,8 l".equals(ConsumptionDisplay.instantaneous(s.copy())), "Snapshot fields copied");
+        s.rangeConsumption = 7.8;
+        check("0,8 l/h".equals(ConsumptionDisplay.instantaneous(s)), "Running idle uses litres per hour");
+        check("0,8 l/h".equals(ConsumptionDisplay.instantaneous(s.copy())), "Snapshot fields copied");
         s.rpm = 0; s.rpmUpdatedAtMs = s.instConsumptionUpdatedAtMs;
         check("--".equals(ConsumptionDisplay.instantaneous(s.copy())), "Fresh CAN engine-off overrides cached OBD idle");
         s.rpmUpdatedAtMs = s.instConsumptionUpdatedAtMs - 1;
-        check("0,8 l".equals(ConsumptionDisplay.instantaneous(s)), "Old CAN zero cannot hide newer running OBD sample");
+        check("0,8 l/h".equals(ConsumptionDisplay.instantaneous(s)), "Old CAN zero cannot hide newer running OBD sample");
         s.rpmUpdatedAtMs = 0;
         s.obdSpeedKmh = 2;
-        check("0,8 l".equals(ConsumptionDisplay.instantaneous(s)), "Crawling");
+        check("0,8 l/h".equals(ConsumptionDisplay.instantaneous(s)), "Crawling");
         s.obdSpeedKmh = 3; s.instConsumption = 26.7;
         check("26,7 l".equals(ConsumptionDisplay.instantaneous(s)), "Driving threshold");
+        // Coasting without throttle: per-100-km figure is 0 -> show litres per hour instead
+        s.obdSpeedKmh = 60; s.obdRpm = 1800; s.instConsumption = 0.0; s.obdFuelLitersPerHour = 0.0;
+        check("0,0 l/h".equals(ConsumptionDisplay.instantaneous(s)), "Coasting shows l/h");
+        s.instConsumption = 0.04; s.obdFuelLitersPerHour = 0.03;
+        check("0,0 l/h".equals(ConsumptionDisplay.instantaneous(s)), "Almost zero still shows l/h");
+        s.instConsumption = 3.1; s.obdFuelLitersPerHour = 1.9;
+        check("3,1 l".equals(ConsumptionDisplay.instantaneous(s)), "Light throttle stays l/100km");
+        s.instConsumption = 0.0; s.obdFuelLitersPerHour = Double.NaN;
+        check("0,0 l".equals(ConsumptionDisplay.instantaneous(s)), "Without l/h value the old display stays");
         s.obdSpeedKmh = 0; s.obdRpm = 0;
+        s.instConsumption = 26.7; s.obdFuelLitersPerHour = 0.8;
         check("--".equals(ConsumptionDisplay.instantaneous(s)), "Engine off hides hourly rate");
         s.obdSpeedKmh = 20; s.instConsumption = 4.5;
         check("--".equals(ConsumptionDisplay.instantaneous(s)), "Engine off also hides driving figure");
@@ -37,7 +47,7 @@ public final class ConsumptionDisplayTest {
             live.instConsumptionUpdatedAtMs = s.instConsumptionUpdatedAtMs;
         }
         check(Double.isNaN(VehicleRepository.snapshot().obdFuelLitersPerHour), "Repository expires hourly rate");
-        check(s.avgConsumption == 7.8, "Formatting never changes average");
+        check(s.rangeConsumption == 7.8, "Formatting never changes average");
         System.out.println("ConsumptionDisplayTest OK");
     }
     private static void check(boolean ok, String message) {

@@ -8,6 +8,13 @@ public class Context {
     public final Map<String,Object> services=new HashMap<>();
     public java.io.File getExternalFilesDir(String type){return externalFilesDir;}
     public Object getSystemService(String name){return services.get(name);}
+    @SuppressWarnings("unchecked")
+    public <T> T getSystemService(Class<T> type){
+        for(Object value:services.values()) if(type.isInstance(value)) return (T)value;
+        return null;
+    }
+    public android.content.ComponentName startService(Intent intent){return null;}
+    public android.content.ComponentName startForegroundService(Intent intent){return null;}
     private final Map<String,Prefs> preferences=new HashMap<>();
     public Context getApplicationContext(){return this;}
     public boolean bindService(Intent intent,ServiceConnection connection,int flags){binds++;return true;}

@@ -1,1 +1,1 @@
-package org.maplibre.android.maps; public class Style { public interface OnStyleLoaded { void onStyleLoaded(Style s); } }
+package org.maplibre.android.maps; public class Style { public static class Builder { public Builder fromJson(String j){return this;} } public interface OnStyleLoaded { void onStyleLoaded(Style s); } }

@@ -82,20 +82,6 @@ final class Obd2PidDecoder {
         return v >= 0 && v <= 255 ? v : Double.NaN;
     }
 
-    /** PID 0x10 mass air flow in g/s: ((A*256)+B)/100. NaN when missing/implausible. */
-    static double mafGs(int[] d) {
-        if (d == null || d.length < 2) return Double.NaN;
-        double v = (d[0] * 256 + d[1]) / 100.0;
-        return v >= 0 && v < 700 ? v : Double.NaN;
-    }
-
-    /** PID 0x2F fuel tank level in percent: A*100/255. NaN when missing/implausible. */
-    static double fuelPercent(int[] d) {
-        if (d == null || d.length < 1) return Double.NaN;
-        double v = d[0] * 100.0 / 255.0;
-        return v >= 0 && v <= 100 ? v : Double.NaN;
-    }
-
     /**
      * Decodes an OBD2 "supported PIDs" bitmap response (e.g. from 0100 or 0120) and reports
      * whether pidNumber is supported. firstPidInBitmap is the first PID that bitmap covers

@@ -40,7 +40,7 @@ public final class Obd2ClientTest {
     }
     public static void main(String[] args)throws Exception{
         Context context=new Context();Obd2Client client=new Obd2Client();Elm elm=new Elm();
-        check(Double.isNaN(client.displayAverage(context)), "No saved average displays no fabricated value");
+        check(Double.isNaN(client.rangeAverage(context)), "No saved average displays no fabricated value");
         set(client,"running",true);set(client,"thread",Thread.currentThread());
         set(client,"in",elm);set(client,"out",elm.output);set(client,"averageStoreContext",context);
         synchronized(VehicleRepository.class){VehicleRepository.mutable().fuelLiters=27;}
@@ -49,7 +49,7 @@ public final class Obd2ClientTest {
             call(client,"pollOnce",new Class<?>[]{Context.class},context);
         }
         VehicleState live=VehicleRepository.snapshot();
-        check(Double.isFinite(live.instConsumption)&&Double.isFinite(live.avgConsumption),"Real polling publishes instantaneous and average figures");
+        check(Double.isFinite(live.instConsumption)&&Double.isFinite(live.rangeConsumption),"Real polling publishes instantaneous and average figures");
         check(Double.isFinite(live.obdFuelLitersPerHour) && Double.isFinite(live.obdSpeedKmh) && live.obdRpm == 3000,
                 "Polling publishes coherent hourly display inputs");
         check(VehicleRepository.mutable().fuelLiters==27,"CAN tank remains untouched");
@@ -58,31 +58,25 @@ public final class Obd2ClientTest {
         String debug=client.diagnostics(context);
         check(debug.contains("Abgeschlossene Abfragerunden: 100") && debug.contains("RPM=3000"),"Debug shows actual poll count and PID values");
         check(debug.contains("Brauchbare Verbrauchsdaten: JA"),"Debug distinguishes usable data from connection alone");
-        check(debug.contains("OBD gesammelte Strecke:") && debug.contains("OBD gesammelter Kraftstoff:"),
-                "Diagnostic exposes average denominator and numerator");
+        check(debug.contains("Adaptives Reichweitenfenster:") && !debug.contains("seit Tanken"),
+                "Diagnostic exposes the rolling range window only");
         call(client,"saveAverage",new Class<?>[]{});
         Obd2Client restored=new Obd2Client();
         call(restored,"loadAverage",new Class<?>[]{Context.class},context);
         Field field=Obd2Client.class.getDeclaredField("averager");field.setAccessible(true);
         Obd2ConsumptionAverager average=(Obd2ConsumptionAverager)field.get(restored);
-        check(Math.abs(average.value()-live.avgConsumption)<1e-9,"Production persistence restores average");
-        check(Math.abs(new Obd2Client().displayAverage(context)-live.avgConsumption)<1e-9,
+        check(Math.abs(average.value()-live.rangeConsumption)<1e-9,"Production persistence restores range profile");
+        check(Math.abs(new Obd2Client().rangeAverage(context)-live.rangeConsumption)<1e-9,
                 "Cold display restores persisted average without connection or polling");
         elm.missing=true;SystemClock.now+=1_000;
         call(client,"pollOnce",new Class<?>[]{Context.class},context);
         VehicleState missing=VehicleRepository.snapshot();
-        check(Double.isNaN(missing.avgConsumption)&&Double.isNaN(missing.instConsumption),"NO DATA not advertised as fresh usable OBD average");
-        check(Math.abs(client.displayAverage(context)-live.avgConsumption)<1e-9,
+        check(Double.isNaN(missing.rangeConsumption)&&Double.isNaN(missing.instConsumption),"NO DATA not advertised as fresh usable OBD average");
+        check(Math.abs(client.rangeAverage(context)-live.rangeConsumption)<1e-9,
                 "Running display keeps accumulator while adapter returns NO DATA");
-        check(Double.isNaN(VehicleRepository.snapshot().avgConsumption),
+        check(Double.isNaN(VehicleRepository.snapshot().rangeConsumption),
                 "Display lookup never publishes cached value as fresh range data");
         check(client.diagnostics(context).contains("Brauchbare Verbrauchsdaten: NEIN"),"NO DATA immediately visible in debug");
-        client.resetAverageConsumption(context);
-        check(Double.isNaN(VehicleRepository.mutable().avgConsumption),"Reset immediately clears published average");
-        check(Double.isNaN(client.displayAverage(context)) && Double.isNaN(new Obd2Client().displayAverage(context)),
-                "Reset clears running and persisted display values");
-        call(restored,"loadAverage",new Class<?>[]{Context.class},context);
-        check(Double.isNaN(average.value()),"Reset persists across reloading");
         final boolean[] closed={false};
         android.bluetooth.BluetoothSocket first=new android.bluetooth.BluetoothSocket(){
             public void connect()throws IOException{throw new IOException("Clone SDP failure");}

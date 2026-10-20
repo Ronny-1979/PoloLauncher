@@ -21,7 +21,6 @@ import java.util.Set;
 public final class Obd2SettingsActivity extends Activity {
     private LinearLayout deviceList;
     private TextView status;
-    private TextView calibration;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refresh = new Runnable() {
         @Override public void run() { refreshStatus(); handler.postDelayed(this, 1000L); }
@@ -29,21 +28,20 @@ public final class Obd2SettingsActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        CopperSkin.apply(this);
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackground(CopperSkin.background());
+        scroll.setBackground(GlassSkin.background(this));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(28), dp(18), dp(28), dp(24));
         scroll.addView(root);
 
-        root.addView(text("VERBRAUCH ÜBER OBD2", 25, true));
+        root.addView(text("OBD2-ADAPTER UND VERBRAUCH", 25, true));
         status = text("", 16, false);
         root.addView(status);
 
         TextView permission = text("Bluetooth-Berechtigung erteilen", 18, true);
         permission.setPadding(dp(16), dp(12), dp(16), dp(12));
-        permission.setBackground(CopperSkin.touch(this, false));
+        permission.setBackground(GlassSkin.touch(this, false));
         permission.setOnClickListener(v -> requestBluetoothPermission());
         root.addView(permission, topMargin());
 
@@ -54,81 +52,30 @@ public final class Obd2SettingsActivity extends Activity {
 
         TextView rescan = text("Liste aktualisieren", 17, true);
         rescan.setPadding(dp(16), dp(12), dp(16), dp(12));
-        rescan.setBackground(CopperSkin.touch(this, false));
+        rescan.setBackground(GlassSkin.touch(this, false));
         rescan.setOnClickListener(v -> loadPairedDevices());
         root.addView(rescan, topMargin());
 
-        root.addView(text("Der ELM327-Adapter muss vorher in den normalen Android-Bluetooth-"
-                + "Einstellungen gekoppelt sein (PIN meist 1234 oder 0000). Danach hier aus der "
-                + "Liste auswählen.\n\n"
-                + "Dieses Fahrzeug (VW Polo V 1.2, Motor CGPB) hat laut Steuergerät keinen "
-                + "Luftmassenmesser und keine OBD2-Tankstandsanzeige (per Adapter-Diagnose "
-                + "bestätigt). Ausgelesen werden daher Drehzahl, Geschwindigkeit, Saugrohrdruck "
-                + "(PID 0x0B) und Ansauglufttemperatur (PID 0x0F); daraus wird die Luftmasse und "
-                + "damit der Verbrauch geschätzt (Speed-Density-Verfahren mit angenommenem "
-                + "volumetrischen Wirkungsgrad – eine Schätzung, keine Messung wie bei einem "
-                + "echten MAF-Sensor). Der Tankstand kommt weiterhin über CAN. Nur für Benziner "
-                + "(feste Luftzahl 14,7:1) – für einen TDI wäre eine andere Berechnung nötig.\n\n"
-                + "Der Ø-Verbrauch läuft streckengewichtet über Zündungszyklen und Neustarts "
-                + "hinweg weiter (nicht nur die Anzeige – die zugrunde liegende Summe aus Litern "
-                + "und Kilometern wird gespeichert und beim nächsten Start fortgesetzt), damit die "
-                + "Restkilometer-Schätzung durchgehend mit echten Werten weiterrechnet. Für eine "
-                + "frische Zahl unten zurücksetzen.\n\n"
-                + "Die Verbindung läuft im selben Hintergrunddienst wie die CAN-Erfassung und "
-                + "startet automatisch, sobald der Launcher oder die Diagnose geöffnet ist. Bricht "
-                + "ein günstiger Adapter die Verbindung ab, verbindet die App nach kurzer Pause "
-                + "selbst neu, statt die Verbindung im Sekundentakt zu erzwingen.", 15, false));
-
-        TextView resetAverage = text("Ø-Verbrauch (OBD2) zurücksetzen", 18, true);
-        resetAverage.setPadding(dp(16), dp(12), dp(16), dp(12));
-        resetAverage.setBackground(CopperSkin.touch(this, false));
-        resetAverage.setOnClickListener(v -> CopperSkin.dialog(this)
-                .setTitle("Ø-Verbrauch zurücksetzen?")
-                .setMessage("Die bisher über OBD2 gesammelte Strecke und Kraftstoffmenge für den "
-                        + "Ø-Verbrauch werden gelöscht. Die Reichweitenschätzung (CAN-Lernwert unter "
-                        + "Tank und Reichweite) ist davon nicht betroffen.")
-                .setNegativeButton("Abbrechen", null)
-                .setPositiveButton("Zurücksetzen", (dialog, which) ->
-                        Obd2Runtime.resetAverageConsumption(this))
-                .show());
-        root.addView(resetAverage, topMargin());
+        root.addView(text("Den ELM327 zuerst in Android koppeln (PIN meist 1234 oder 0000) und danach hier auswählen. "
+                + "Der Verbrauch wird aus Drehzahl, Geschwindigkeit, Saugrohrdruck und Ansauglufttemperatur geschätzt. "
+                + "Der sichtbare Durchschnitt (Ø 100 KM) ist der gleitende Mittelwert der letzten 100 gefahrenen Kilometer und bleibt über Neustarts erhalten. "
+                + "Die Restreichweite verwendet dasselbe gleitende Fahrprofil. "
+                + "Bei einer Unterbrechung verbindet sich der Hintergrunddienst automatisch neu.", 14, false));
 
         android.widget.Switch fuelCut = new android.widget.Switch(this);
         fuelCut.setText("Schubabschaltung schätzen (im Schub keinen Kraftstoff zählen)");
         fuelCut.setTextSize(16);
-        fuelCut.setTextColor(CopperSkin.CREAM);
+        fuelCut.setTextColor(GlassSkin.TEXT);
         fuelCut.setChecked(Obd2Client.dfcoEnabled(this));
         fuelCut.setOnCheckedChangeListener((button, enabled) -> Obd2Client.setDfcoEnabled(this, enabled));
         root.addView(fuelCut, topMargin());
-        root.addView(text("Das Speed-Density-Verfahren sieht im Schub (hohe Drehzahl, niedriger Saugrohrdruck, "
-                + "Fahrt) Luft und würde Kraftstoff zählen, obwohl die Einspritzung abgeschaltet ist. Die Schätzung "
-                + "erkennt das über Schwellen für Drehzahl (ab 1300/min), Saugrohrdruck (bis 30 kPa) und Geschwindigkeit "
-                + "(ab 10 km/h). Die Schwellen sind nicht am Auto verifiziert: Die Diagnose zeigt, wie viele Runden so "
-                + "eingestuft wurden.\n\n"
-                + "Modellkorrektur: Nach jedem bestätigten CAN-Lernabschnitt (mindestens 100 km und 5 L echter "
-                + "Tankabnahme) vergleicht die App die vom OBD-Modell im selben Abschnitt gezählten Liter mit der "
-                + "echten Tankabnahme und korrigiert den angenommenen volumetrischen Wirkungsgrad um ein Viertel der "
-                + "Abweichung (Faktor 0,6 bis 1,5).", 15, false));
-        calibration = text("", 16, false);
-        root.addView(calibration);
-        TextView resetCalibration = text("Modellkorrektur zurücksetzen", 18, true);
-        resetCalibration.setPadding(dp(16), dp(12), dp(16), dp(12));
-        resetCalibration.setBackground(CopperSkin.touch(this, false));
-        resetCalibration.setOnClickListener(v -> CopperSkin.dialog(this)
-                .setTitle("Modellkorrektur zurücksetzen?")
-                .setMessage("Der gelernte Korrekturfaktor wird auf 1,000 gesetzt. Die gesammelte Strecke und der "
-                        + "Ø-Verbrauch bleiben erhalten.")
-                .setNegativeButton("Abbrechen", null)
-                .setPositiveButton("Zurücksetzen", (dialog, which) -> {
-                    Obd2Runtime.resetCalibration(this);
-                    refreshStatus();
-                })
-                .show());
-        root.addView(resetCalibration, topMargin());
+        root.addView(text("Beim Rollen mit hoher Drehzahl, niedrigem Saugrohrdruck und mindestens 10 km/h kann die "
+                + "Schubabschaltung als 0 l erkannt werden. Die Diagnose zeigt, wie oft diese Schätzung verwendet wurde.",
+                14, false));
 
         TextView back = text("Zurück", 20, true);
         back.setPadding(dp(16), dp(14), dp(16), dp(14));
-        back.setBackground(CopperSkin.touch(this, false));
+        back.setBackground(GlassSkin.touch(this, false));
         back.setOnClickListener(v -> finish());
         root.addView(back, topMargin());
 
@@ -155,10 +102,7 @@ public final class Obd2SettingsActivity extends Activity {
         if (status == null) return;
         boolean connected = Obd2Runtime.isConnected();
         status.setText(String.format(Locale.GERMANY, "Status: %s", Obd2Runtime.status()));
-        status.setTextColor(connected ? CopperSkin.GREEN : CopperSkin.CREAM);
-        if (calibration != null)
-            calibration.setText(String.format(Locale.GERMANY, "Modellkorrektur: Faktor %.3f (1,000 = unkorrigiert)",
-                    Obd2Runtime.veScale(this)));
+        status.setTextColor(connected ? GlassSkin.GREEN : GlassSkin.TEXT);
     }
 
     private boolean hasBluetoothPermission() {
@@ -212,7 +156,7 @@ public final class Obd2SettingsActivity extends Activity {
             boolean selected = address.equals(current);
             TextView row = text((selected ? "✓ " : "") + name + "\n" + address, 16, selected);
             row.setPadding(dp(16), dp(10), dp(16), dp(10));
-            row.setBackground(CopperSkin.touch(this, selected));
+            row.setBackground(GlassSkin.touch(this, selected));
             row.setOnClickListener(v -> {
                 Obd2Client.setDeviceAddress(Obd2SettingsActivity.this, address);
                 Toast.makeText(Obd2SettingsActivity.this, "OBD2-Adapter: " + address, Toast.LENGTH_SHORT).show();
@@ -234,7 +178,7 @@ public final class Obd2SettingsActivity extends Activity {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
-        view.setTextColor(bold ? CopperSkin.GOLD : CopperSkin.CREAM);
+        view.setTextColor(bold ? GlassSkin.ACCENT : GlassSkin.TEXT);
         view.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
         view.setPadding(0, dp(8), 0, dp(8));
         return view;

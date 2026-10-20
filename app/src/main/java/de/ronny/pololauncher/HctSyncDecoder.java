@@ -17,10 +17,7 @@ import java.util.Map;
  * 0x90 poll requests are sent separately by {@link HctOemAutoPoller} through the vendor Binder.
  */
 public final class HctSyncDecoder {
-    private final Map<Integer, Integer> counts = new LinkedHashMap<>();
     private final Map<Integer, String> lastPayload = new LinkedHashMap<>();
-    private long totalPackets;
-    private long validPackets;
     private int lastDoorMask = -1;
     private int lastMode1Status = -1;
     private int lastMode3Status = -1;
@@ -33,7 +30,6 @@ public final class HctSyncDecoder {
 
     public synchronized void feed(byte[] raw) {
         if (raw == null || raw.length < 2) return;
-        totalPackets++;
 
         // Serial transports are length/checksum checked and normalized before
         // entering this confirmed VW/HCT decoder. Never treat a start as an ID.
@@ -48,8 +44,6 @@ public final class HctSyncDecoder {
             return;
         }
 
-        validPackets++;
-        counts.put(function, counts.getOrDefault(function, 0) + 1);
         // Log packet changes prominently. 0x41/Mode2 is deliberately throttled: RPM
         // makes almost every packet unique and otherwise pushes rare discovery frames out
         // of the diagnostic ring buffer. The decoder still processes every Mode2 packet.
@@ -198,7 +192,8 @@ public final class HctSyncDecoder {
                 VehicleState s = VehicleRepository.mutable();
                 boolean hit = false;
                 long signalNow = VehicleRepository.now();
-                if (rpm >= 0 && rpm < 9000) { s.rpm = rpm; s.rpmUpdatedAtMs = signalNow; hit = true; }
+                if (rpm >= 0 && rpm < 9000) { VehicleRepository.logRpmAtStandstill("CAN-Frame", rpm, s); s.noteRpm(rpm, signalNow); hit = true; }
+                if (speed >= 0 && speed < 400) { s.speedKmh = speed; s.speedUpdatedAtMs = signalNow; hit = true; }
                 if (voltage >= 5 && voltage < 20) { s.voltage = voltage; s.voltageUpdatedAtMs = signalNow; hit = true; }
                 if (outside >= -60 && outside <= 90) { s.outsideC = outside; s.outsideUpdatedAtMs = signalNow; hit = true; }
                 if (odometer > 0 && odometer < 2_000_000) { s.odometerKm = odometer; s.odometerUpdatedAtMs = signalNow; hit = true; }
@@ -234,33 +229,46 @@ public final class HctSyncDecoder {
             return;
         }
 
-        // Mode 3 behavior is confirmed by the live ignition/engine test: it is a warning/status byte, not RPM/temperature.
+        // Mode 3 behavior is confirmed by the live ignition/engine test: it is a warning/status byte.
+        // On this Polo both oil + charging warnings together appear when the engine is stopped.
+        // Both off means normal running state. A single warning is treated as a warning/fault and
+        // deliberately NOT used as an engine-state decision.
         if (mode == 3 && length >= 2) {
             int status = d[offset + 1] & 0xFF;
+            boolean oilWarning = (status & 0x80) != 0;
+            boolean chargeWarning = (status & 0x40) != 0;
+            long signalNow = VehicleRepository.now();
+
+            synchronized (VehicleRepository.class) {
+                VehicleState s = VehicleRepository.mutable();
+                if (oilWarning == chargeWarning) {
+                    s.engineStateKnown = true;
+                    s.engineStoppedByCan = oilWarning; // both on = stopped, both off = running
+                    s.engineStateUpdatedAtMs = signalNow;
+                    if (s.engineStoppedByCan) {
+                        // Update the published raw value as well, so all consumers see 0 immediately.
+                        s.noteRpm(0, signalNow);
+                    }
+                    VehicleRepository.touch("HCT SYNC 0x41/3 Motorstatus");
+                } else {
+                    // One warning alone can be a real fault while the engine is running.
+                    s.engineStateKnown = false;
+                    s.engineStateUpdatedAtMs = signalNow;
+                }
+            }
+
             if (status != lastMode3Status) {
                 lastMode3Status = status;
                 DiagLog.add(String.format(Locale.US,
-                        "HCT 0x41/3 OEM Status=0x%02X Ölwarnung=%s Ladewarnung=%s",
+                        "HCT 0x41/3 OEM Status=0x%02X Ölwarnung=%s Ladewarnung=%s Motor=%s",
                         status,
-                        (status & 0x80) != 0 ? "AN" : "aus",
-                        (status & 0x40) != 0 ? "AN" : "aus"));
+                        oilWarning ? "AN" : "aus",
+                        chargeWarning ? "AN" : "aus",
+                        oilWarning && chargeWarning ? "AUS"
+                                : (!oilWarning && !chargeWarning ? "LÄUFT" : "UNBESTIMMT")));
             }
         }
     }
-
-    public synchronized String summary() {
-        if (counts.isEmpty()) return "noch keine com.microntek.sync-Pakete";
-        StringBuilder b = new StringBuilder();
-        for (Map.Entry<Integer,Integer> e : counts.entrySet()) {
-            if (b.length() > 0) b.append("  ");
-            b.append(String.format(Locale.US, "0x%02X:%d", e.getKey(), e.getValue()));
-        }
-        return b.toString();
-    }
-
-    public synchronized long validPacketCount() { return validPackets; }
-    public synchronized long totalPacketCount() { return totalPackets; }
-    public synchronized int lastDoorMask() { return lastDoorMask; }
 
     private static int be16(byte[] d, int o) {
         return ((d[o] & 0xFF) << 8) | (d[o + 1] & 0xFF);

@@ -19,17 +19,11 @@ final class Obd2Runtime {
         if (refs == 0) CLIENT.stop();
     }
 
-    /** {litres, km} accumulated by the OBD average (running or persisted). */
-    static synchronized double[] totals(Context context) { return CLIENT.totals(context); }
-    static synchronized void calibrate(Context context, double windowRatio) { CLIENT.calibrate(context, windowRatio); }
-    static synchronized void resetCalibration(Context context) { CLIENT.resetCalibration(context); }
-    static synchronized double veScale(Context context) { return CLIENT.veScale(context); }
+    /** Called when the head unit wakes from standby: drop the old Bluetooth link and reconnect now. */
+    static void requestReconnect() { CLIENT.requestReconnect(); }
     static synchronized boolean isConnected() { return CLIENT.isConnected(); }
     static synchronized String status() { return CLIENT.status(); }
     static synchronized String diagnostics(Context context) { return CLIENT.diagnostics(context); }
-    static synchronized void resetAverageConsumption(Context context) { CLIENT.resetAverageConsumption(context); }
-    static synchronized double displayAverage(Context context) { return CLIENT.displayAverage(context); }
-    static synchronized double reliableDisplayAverage(Context context) { return CLIENT.reliableDisplayAverage(context); }
-    /** Cumulative consumption baseline, not a new measurement or freshness signal. */
-    static synchronized double rangeAverage(Context context) { return CLIENT.displayAverage(context); }
+    /** Persisted rolling 100-km driving profile (dashboard "Ø 100 KM" and range). */
+    static synchronized double rangeAverage(Context context) { return CLIENT.rangeAverage(context); }
 }

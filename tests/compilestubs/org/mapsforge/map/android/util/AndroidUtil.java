@@ -1,1 +1,0 @@
-package org.mapsforge.map.android.util; public class AndroidUtil { public static org.mapsforge.map.layer.cache.TileCache createTileCache(android.content.Context c,String id,int tile,float ratio,double overdraw){return null;} }

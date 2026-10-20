@@ -22,6 +22,7 @@ import java.util.List;
 final class DabSessionWatcher {
     private static final long RETRY_MS = 5_000L;
     private static final long RESYNC_MS = 20_000L;
+    private static final int MAX_TEXT_CHARS = 512;
 
     private final Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -115,26 +116,36 @@ final class DabSessionWatcher {
     }
 
     private void bind(List<MediaController> sessions) {
-        MediaController found = null;
-        if (sessions != null) {
-            for (MediaController candidate : sessions) {
-                if (DabNotificationListener.isDabPackage(context, candidate.getPackageName())) {
-                    found = candidate;
-                    break;
+        try {
+            MediaController found = null;
+            if (sessions != null) {
+                for (MediaController candidate : sessions) {
+                    if (candidate != null
+                            && DabNotificationListener.isDabPackage(context, candidate.getPackageName())) {
+                        found = candidate;
+                        break;
+                    }
                 }
             }
-        }
-        if (found == null) {
+            if (found == null) {
+                unbindController();
+                status = DabControls.statusOf(null);
+                return;
+            }
+            if (controller == null || !controller.getSessionToken().equals(found.getSessionToken())) {
+                unbindController();
+                controller = found;
+                controller.registerCallback(callback, handler);
+            }
+            refresh();
+        } catch (RuntimeException sessionRace) {
+            // The session can disappear between OnActiveSessionsChanged and registerCallback().
+            // Never let that normal race crash the launcher main thread.
             unbindController();
             status = DabControls.statusOf(null);
-            return;
+            DiagLog.add("DAB MediaSession Bind-Race: "
+                    + sessionRace.getClass().getSimpleName());
         }
-        if (controller == null || !controller.getSessionToken().equals(found.getSessionToken())) {
-            unbindController();
-            controller = found;
-            controller.registerCallback(callback, handler);
-        }
-        refresh();
     }
 
     private void unbindController() {
@@ -183,8 +194,15 @@ final class DabSessionWatcher {
     private static String metadata(MediaMetadata m, String... keys) {
         if (m == null) return "";
         for (String key : keys) {
-            String s = m.getString(key);
-            if (s != null && !s.trim().isEmpty()) return s.trim();
+            try {
+                String s = m.getString(key);
+                if (s == null) continue;
+                String value = s.replace('\n', ' ').replace('\r', ' ').trim();
+                if (value.isEmpty()) continue;
+                return value.length() <= MAX_TEXT_CHARS
+                        ? value : value.substring(0, MAX_TEXT_CHARS);
+            } catch (RuntimeException ignored) {
+            }
         }
         return "";
     }

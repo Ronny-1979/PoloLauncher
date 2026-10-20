@@ -62,12 +62,13 @@ public final class HctCanbusBinderRuntime {
     private static long nextBindAtMs;
     private static int refs;
     private static long callbackFrames;
-    private static String lastTransport = "passiv – nichts gesendet";
     private static long lastMode2RawLogAt;
+    private static long lastOversizeFrameLogAt;
     private static final Map<Integer, Long> CALLBACK_FUNCTION_COUNTS = new LinkedHashMap<>();
     private static final Set<String> UNIQUE_CALLBACK_FRAMES = new LinkedHashSet<>();
     private static final Set<Integer> HIGHLIGHTED_TYPE1_UNMAPPED = new LinkedHashSet<>();
     private static final int MAX_LOGGED_UNIQUE_FRAMES = 400;
+    private static final int MAX_CALLBACK_FRAME_BYTES = 4_096;
     private static final HctSyncDecoder RAW_DECODER = new HctSyncDecoder();
     // Two bounded workers keep teardown/reconnect live even if one vendor transact hangs.
     private static final ThreadPoolExecutor BINDER_IO = new ThreadPoolExecutor(
@@ -205,9 +206,11 @@ public final class HctCanbusBinderRuntime {
             if (code == 1) { // ICanBusAidlCallBack.CanBusServiceData(byte[])
                 data.enforceInterface(CALLBACK_DESCRIPTOR);
                 byte[] raw = data.createByteArray();
+                boolean accepted;
                 synchronized (HctCanbusBinderRuntime.class) {
-                    if (activeCallback == this && refs > 0) handleCallbackFrame(raw);
+                    accepted = activeCallback == this && refs > 0;
                 }
+                if (accepted) handleCallbackFrame(raw);
                 if (reply != null) reply.writeNoException();
                 return true;
             }
@@ -278,6 +281,14 @@ public final class HctCanbusBinderRuntime {
 
     private static void handleCallbackFrame(byte[] raw) {
         if (raw == null) return;
+        if (raw.length > MAX_CALLBACK_FRAME_BYTES) {
+            long now = android.os.SystemClock.uptimeMillis();
+            if (now - lastOversizeFrameLogAt >= 10_000L) {
+                lastOversizeFrameLogAt = now;
+                DiagLog.add("AIDL RX verworfen: übergroßer Frame (" + raw.length + " Bytes)");
+            }
+            return;
+        }
         int function = -1;
         if (raw.length >= 2 && (raw[0] & 0xFF) == 0x2E) function = raw[1] & 0xFF;
         else if (raw.length >= 1) function = raw[0] & 0xFF;
@@ -329,18 +340,6 @@ public final class HctCanbusBinderRuntime {
     }
 
     public static synchronized long callbackFrameCount() { return callbackFrames; }
-    public static synchronized String lastTransport() { return lastTransport; }
-    public static synchronized int uniqueCallbackFrameCount() { return UNIQUE_CALLBACK_FRAMES.size(); }
-
-    public static synchronized void resetCallbackStats() {
-        callbackFrames = 0L;
-        lastTransport = "passiv – nichts gesendet";
-        CALLBACK_FUNCTION_COUNTS.clear();
-        UNIQUE_CALLBACK_FRAMES.clear();
-        HIGHLIGHTED_TYPE1_UNMAPPED.clear();
-        lastMode2RawLogAt = 0L;
-    }
-
     public static synchronized String callbackSummary() {
         if (CALLBACK_FUNCTION_COUNTS.isEmpty()) return "noch keine AIDL-Rohdaten";
         StringBuilder out = new StringBuilder();
@@ -350,25 +349,6 @@ public final class HctCanbusBinderRuntime {
         }
         out.append(" | unique=").append(UNIQUE_CALLBACK_FRAMES.size());
         return out.toString();
-    }
-
-    /** Exact function roles recovered for this radio's CANBUS type-1 decoder. */
-    public static String type1KnownMap() {
-        return "0x16=Speed | 0x21=Klima | 0x22/0x23=Radar | 0x24=Türen | " +
-                "0x26=Lenkwinkel/Rückfahrpfad | 0x30=CANBOX-Version | 0x41=Fahrzeugdaten | 0x69=AppData";
-    }
-
-    /** Functions not assigned by the original Canbus01 CmdProc. 0x27 is excluded here
-     * because the OEM init path explicitly requests it and it behaves like init/status. */
-    public static synchronized String callbackType1UnmappedSummary() {
-        StringBuilder out = new StringBuilder();
-        for (Map.Entry<Integer, Long> e : CALLBACK_FUNCTION_COUNTS.entrySet()) {
-            int fn = e.getKey();
-            if (!isType1UnmappedFunction(fn)) continue;
-            if (out.length() > 0) out.append("  ");
-            out.append(String.format(Locale.US, "0x%02X:%d", fn, e.getValue()));
-        }
-        return out.length() == 0 ? "keine" : out.toString();
     }
 
     private static boolean isType1UnmappedFunction(int fn) {
@@ -387,16 +367,6 @@ public final class HctCanbusBinderRuntime {
             default:
                 return true;
         }
-    }
-
-    public static void logServiceInfo() {
-        IBinder b;
-        synchronized (HctCanbusBinderRuntime.class) { b = remote; }
-        if (b == null) {
-            DiagLog.add("=== HCT CANBUS SERVICE INFO: noch nicht verbunden ===");
-            return;
-        }
-        executeBinderTask("Service-Info", () -> logServiceInfo(b));
     }
 
     private static void executeBinderTask(String name, Runnable task) {
@@ -435,7 +405,6 @@ public final class HctCanbusBinderRuntime {
         }
         if (b == null || !b.isBinderAlive()) return false;
         sendViaBinder(b, frame);
-        synchronized (HctCanbusBinderRuntime.class) { lastTransport = "HCT AIDL sendCanbusData"; }
         return true;
     }
 
@@ -503,11 +472,6 @@ public final class HctCanbusBinderRuntime {
 
     public static byte[] buildCarInfoQuery(int mode) {
         return build2E(0x90, new byte[] { 0x41, (byte) mode });
-    }
-
-    /** Generic OEM read request used by controlinfo: 0x90 [function, sub]. */
-    public static byte[] buildReadQuery(int function, int sub) {
-        return build2E(0x90, new byte[] { (byte) function, (byte) sub });
     }
 
     private static String safeDescriptor(IBinder b) {

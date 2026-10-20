@@ -10,17 +10,33 @@ android {
         applicationId 'de.ronny.pololauncher'
         minSdk 26
         targetSdk 33
+        // PBF import adds protobuf/Osmosis classes. Android 5+ supports native multidex.
+        multiDexEnabled true
         // The radio is ARM: without a filter MapLibre ships four native ABIs (x86 included).
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
-        versionCode 65
-        versionName '0.30.4'
+        versionCode 205
+        versionName '0.31.124'
+    }
+
+    buildFeatures {
+        // Required because WeatherClient/LocalityClient use BuildConfig.VERSION_NAME.
+        buildConfig true
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Osmosis core/pbf2 both ship the same root Java resource. AGP 8.7 otherwise
+    // aborts :app:mergeDebugJavaResource with "2 files found with path 'osmosis-plugins.conf'".
+    // We instantiate PbfReader directly, but keep one copy instead of deleting the resource entirely.
+    packaging {
+        resources {
+            pickFirsts += ['osmosis-plugins.conf']
+        }
     }
 
     buildTypes {
@@ -36,13 +52,13 @@ android {
 }
 
 dependencies {
-    // Optional OpenFreeMap vector renderer; Mapsforge remains the offline/fallback engine.
+    // MapLibre renders both Offline Deutschland and the optional OpenFreeMap online map.
     implementation 'org.maplibre.gl:android-sdk:11.8.0'
-    def mapsforgeVersion = '0.30.0'
-    implementation "com.github.mapsforge.mapsforge:mapsforge-core:${mapsforgeVersion}@jar"
-    implementation "com.github.mapsforge.mapsforge:mapsforge-map:${mapsforgeVersion}@jar"
-    implementation "com.github.mapsforge.mapsforge:mapsforge-map-reader:${mapsforgeVersion}@jar"
-    implementation "com.github.mapsforge.mapsforge:mapsforge-themes:${mapsforgeVersion}@jar"
-    implementation "com.github.mapsforge.mapsforge:mapsforge-map-android:${mapsforgeVersion}@jar"
-    implementation 'com.caverock:androidsvg:1.4'
+    // Read Geofabrik .osm.pbf on the radio once, then keep only our compact SQLite traffic DB.
+    implementation('org.openstreetmap.osmosis:osmosis-core:0.49.2') {
+        exclude group: 'net.sf.jpf', module: 'jpf'
+    }
+    implementation('org.openstreetmap.osmosis:osmosis-pbf2:0.49.2') {
+        exclude group: 'net.sf.jpf', module: 'jpf'
+    }
 }

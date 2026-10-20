@@ -14,6 +14,7 @@ final class DockIconView extends View {
     static final int CARPLAY = 3;
     static final int YOUTUBE = 4;
     static final int SETTINGS = 5;
+    static final int APPS = 6;
 
     private final int kind;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -30,7 +31,7 @@ final class DockIconView extends View {
         canvas.save();
         canvas.translate((getWidth() - size) / 2f, (getHeight() - size) / 2f);
         canvas.scale(size / 48f, size / 48f);
-        paint.setColor(CopperSkin.CREAM);
+        paint.setColor(GlassSkin.TEXT);
         paint.setStrokeWidth(3.1f);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
@@ -41,7 +42,8 @@ final class DockIconView extends View {
             case MAPS: maps(canvas); break;
             case CARPLAY: phone(canvas); break;
             case YOUTUBE: youtube(canvas); break;
-            default: settings(canvas);
+            case SETTINGS: settings(canvas); break;
+            default: apps(canvas);
         }
         canvas.restore();
     }
@@ -105,6 +107,18 @@ final class DockIconView extends View {
         play.lineTo(31, 24);
         play.close();
         c.drawPath(play, paint);
+    }
+
+    private void apps(Canvas c) {
+        paint.setStyle(Paint.Style.FILL);
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                float left = 10 + col * 11;
+                float top = 10 + row * 11;
+                c.drawRoundRect(left, top, left + 6, top + 6, 1.5f, 1.5f, paint);
+            }
+        }
+        paint.setStyle(Paint.Style.STROKE);
     }
 
     private void settings(Canvas c) {

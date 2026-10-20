@@ -1,0 +1,7 @@
+{
+  "name": "polo-offline-style",
+  "private": true,
+  "type": "module",
+  "description": "Erzeugt die Offline-Layer-Vorlagen fuer die Geofabrik-Shortbread-Karten aus dem VersaTiles-Stil 'freedom' (MIT).",
+  "dependencies": { "@versatiles/style": "6.4.0" }
+}

@@ -21,6 +21,9 @@ public final class DiagLog {
         }
         String line = TS.format(new Date()) + "  " + text;
         LINES.addFirst(line);
+        if (text.contains("Karte") || text.contains("Hauptseite") || text.contains("Standby")
+                || text.contains("Offline") || text.contains("OpenFreeMap") || text.contains("MapLibre"))
+            MapFollowDiagnostics.event(text.length() > 110 ? text.substring(0, 110) : text);
         while (LINES.size() > MAX) LINES.removeLast();
     }
 
@@ -38,5 +41,4 @@ public final class DiagLog {
         return b.toString();
     }
 
-    public static synchronized void clear() { LINES.clear(); }
 }

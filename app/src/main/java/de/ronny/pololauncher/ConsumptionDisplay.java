@@ -2,8 +2,11 @@ package de.ronny.pololauncher;
 
 import java.util.Locale;
 
-/** Display only: never substitutes a hourly rate for the range/average per-distance rate. */
+/** Display only: the hourly rate replaces the instantaneous per-distance rate at standstill and when coasting; never the range/average. */
 public final class ConsumptionDisplay {
+    /** Below this value the car is coasting without fuel flow; the display switches to l/h. */
+    static final double COASTING_L_PER_100KM = 0.05d;
+
     private ConsumptionDisplay() {}
 
     public static String instantaneous(VehicleState s) {
@@ -17,9 +20,14 @@ public final class ConsumptionDisplay {
         if (s.obdRpm <= 0) return "--";
         if (Double.isFinite(s.obdSpeedKmh) && s.obdSpeedKmh >= 0 && s.obdSpeedKmh < 3.0) {
             if (s.obdRpm > 0 && Double.isFinite(s.obdFuelLitersPerHour) && s.obdFuelLitersPerHour >= 0)
-                return String.format(Locale.GERMANY, "%.1f l", s.obdFuelLitersPerHour);
+                return String.format(Locale.GERMANY, "%.1f l/h", s.obdFuelLitersPerHour);
             return "--";
         }
+        // Rolling without throttle (overrun / fuel cut): l per 100 km is then 0, which says nothing.
+        // Show the real fuel flow in l/h instead, as at a standstill.
+        if (Double.isFinite(s.instConsumption) && s.instConsumption >= 0 && s.instConsumption < COASTING_L_PER_100KM
+                && Double.isFinite(s.obdFuelLitersPerHour) && s.obdFuelLitersPerHour >= 0)
+            return String.format(Locale.GERMANY, "%.1f l/h", s.obdFuelLitersPerHour);
         return Double.isFinite(s.instConsumption) && s.instConsumption >= 0
                 ? String.format(Locale.GERMANY, "%.1f l", s.instConsumption) : "--";
     }

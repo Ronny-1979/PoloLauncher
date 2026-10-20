@@ -15,7 +15,7 @@ import java.util.UUID;
 
 /**
  * Talks to a Bluetooth ELM327 (clone) adapter and estimates fuel consumption, written into
- * {@link VehicleState#instConsumption}/{@link VehicleState#avgConsumption} exactly
+ * {@link VehicleState#instConsumption}/{@link VehicleState#rangeConsumption} exactly
  * like the CAN receivers write their own signals.
  *
  * v0.3.0: this fork's vehicle (VW Polo V 1.2, engine code CGPB, HSN/TSN 0603/APM) was confirmed
@@ -53,6 +53,10 @@ final class Obd2Client {
     private static final long HEARTBEAT_INTERVAL_MS = 30_000L;
     private static final long CMD_TIMEOUT_MS = 1_500L;
     private static final long RESET_TIMEOUT_MS = 3_000L;
+    /** First commands after ATSP0: the adapter may still be searching the protocol ("SEARCHING..."). */
+    private static final long SEARCH_TIMEOUT_MS = 10_000L;
+    /** Single timed-out poll commands are tolerated; only this many in a row drop the link. */
+    private static final int MAX_TIMEOUT_STREAK = 8;
     /** A normal ELM reply is tiny; cap a clone that streams garbage without a prompt. */
     private static final int MAX_REPLY_CHARS = 16_384;
     /** Below this speed a l/100km figure is division noise, not a value; show l/h instead. */
@@ -65,8 +69,19 @@ final class Obd2Client {
      * MAP-based consumption figure, since there is no MAF measurement to calibrate against.
      */
     private static final double VOLUMETRIC_EFFICIENCY = 0.78;
+    /** A Bluetooth connect() that has not returned after this long is hung (stack/adapter in limbo). */
+    private static final long CONNECT_TIMEOUT_MS = 20_000L;
+    /**
+     * Connected, but no usable sample for this long: ELM stuck after an ignition cycle (e.g. it
+     * answered "UNABLE TO CONNECT" while the ECU slept). Re-init the adapter; the limit doubles up
+     * to {@link #NO_DATA_RESTART_MAX_MS} while the car is simply off, and resets on real data.
+     */
+    private static final long NO_DATA_RESTART_MS = 30_000L;
+    private static final long NO_DATA_RESTART_MAX_MS = 300_000L;
+    private static final long WAKE_RECONNECT_DEBOUNCE_MS = 20_000L;
     private static final String KEY_DFCO = "dfco_estimation";
-    private static final String KEY_VE_SCALE = "ve_scale_bits";
+    private static final String KEY_AVG_WINDOW = "avg_rolling_100km_v1";
+    /** Legacy cumulative fields, read once when upgrading from 0.30.21 or older. */
     private static final String KEY_AVG_WEIGHTED_LITERS = "avg_weighted_liters_bits";
     private static final String KEY_AVG_WEIGHTED_KM = "avg_weighted_km_bits";
     /** How often the running average is written back to disk while driving. */
@@ -83,8 +98,6 @@ final class Obd2Client {
     private volatile long completedPolls;
     private volatile InputStream in;
     private volatile OutputStream out;
-    /** Learned correction of {@link #VOLUMETRIC_EFFICIENCY}, see {@link Obd2Calibration}. */
-    private volatile double veScale = 1d;
     private volatile long roundsTotal;
     private volatile long roundsFuelCut;
     private long reconnectDelayMs = RECONNECT_DELAY_MS;
@@ -95,12 +108,22 @@ final class Obd2Client {
     private int suppressedLogs;
     private volatile boolean connected;
     private volatile String status = "Angehalten";
+    private volatile boolean reconnectRequested;
+    private long lastWakeReconnectAtMs;
+    private long connectedAtElapsed;
+    private long lastUsableElapsed;
+    private long noDataRestartMs = NO_DATA_RESTART_MS;
+    private int timeoutStreak = 0;
+    private boolean firstPollAfterConnect = true;
     private final Obd2ConsumptionAverager averager = new Obd2ConsumptionAverager();
     private long lastSampleAtMs;
     private long roundsSinceLastLog;
     private long lastHeartbeatAtMs;
     private long averageLastSavedAtMs;
     private Context averageStoreContext;
+    private boolean storedRangeAverageCached;
+    private SharedPreferences storedRangeAveragePrefs;
+    private double storedRangeAverage = Double.NaN;
 
     static SharedPreferences preferences(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -123,93 +146,65 @@ final class Obd2Client {
         preferences(context).edit().putBoolean(KEY_DFCO, enabled).apply();
     }
 
-    private static double savedVeScale(Context context) {
-        double value = Double.longBitsToDouble(preferences(context).getLong(KEY_VE_SCALE, Double.doubleToLongBits(1d)));
-        return Double.isFinite(value) ? Obd2Calibration.clamp(value) : 1d;
-    }
-
-    /** Current efficiency correction (1.0 = uncalibrated), also while the client is stopped. */
-    synchronized double veScale(Context context) {
-        return running ? veScale : savedVeScale(context);
-    }
-
-    /** Feeds one trusted window ratio (true fuel / modelled fuel) into the persisted correction. */
-    synchronized void calibrate(Context context, double windowRatio) {
-        double previous = running ? veScale : savedVeScale(context);
-        double next = Obd2Calibration.nextScale(previous, windowRatio);
-        veScale = next;
-        preferences(context).edit().putLong(KEY_VE_SCALE, Double.doubleToLongBits(next)).apply();
-        DiagLog.add(String.format(java.util.Locale.GERMANY,
-                "OBD2-Kalibrierung: Fenster-Verhältnis %.3f -> Korrekturfaktor %.3f -> %.3f",
-                windowRatio, previous, next));
-    }
-
-    synchronized void resetCalibration(Context context) {
-        veScale = 1d;
-        preferences(context).edit().remove(KEY_VE_SCALE).apply();
-        DiagLog.add("OBD2: Kalibrierung zurückgesetzt (Faktor 1,000)");
-    }
-
-    /** {litres, km} accumulated by the OBD average; running values or the persisted baseline. */
-    synchronized double[] totals(Context context) {
-        Obd2ConsumptionAverager totals = averageTotals(context);
-        return new double[]{totals.weightedLiters(), totals.weightedKm()};
-    }
-
-    /** Clears the running average, live and persisted, so a fresh figure starts accumulating. */
-    synchronized void resetAverageConsumption(Context context) {
-        synchronized (averager) {
-        averager.reset();
-        preferences(context).edit()
-                .remove(KEY_AVG_WEIGHTED_LITERS).remove(KEY_AVG_WEIGHTED_KM).apply();
-        synchronized (VehicleRepository.class) {
-            VehicleRepository.mutable().avgConsumption = Double.NaN;
-        }
-        }
-        DiagLog.add("OBD2: Ø-Verbrauch zurückgesetzt");
-    }
-
     private void loadAverage(Context context) {
         SharedPreferences p = preferences(context);
-        double liters = Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_LITERS, Double.doubleToLongBits(0d)));
-        double km = Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_KM, Double.doubleToLongBits(0d)));
-        averager.restore(liters, km);
+        String rolling = p.getString(KEY_AVG_WINDOW, null);
+        if (!averager.restoreSnapshot(rolling)) {
+            // Seamless one-time migration from the former cumulative accumulator.
+            double liters = Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_LITERS, Double.doubleToLongBits(0d)));
+            double km = Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_KM, Double.doubleToLongBits(0d)));
+            averager.restore(liters, km);
+            p.edit().putString(KEY_AVG_WINDOW, averager.snapshot())
+                    .remove(KEY_AVG_WEIGHTED_LITERS).remove(KEY_AVG_WEIGHTED_KM).apply();
+        }
+        storedRangeAverage = averager.reliableValue();
+        storedRangeAveragePrefs = p;
+        storedRangeAverageCached = true;
     }
 
-    /** Restored cumulative average: never publish it as a fresh OBD sample. */
-    synchronized double displayAverage(Context context) {
-        if (running) return averager.value();
-        SharedPreferences p = preferences(context);
-        Obd2ConsumptionAverager saved = new Obd2ConsumptionAverager();
-        saved.restore(
+    synchronized double rangeAverage(Context context) {
+        // While connected/running, the averager already owns the parsed bucket window. Do not
+        // serialize and parse ~200 buckets every 500-ms UI/service tick just to read its value.
+        if (running) return averager.reliableValue();
+        SharedPreferences prefs = preferences(context);
+        if (!storedRangeAverageCached || storedRangeAveragePrefs != prefs) {
+            Obd2ConsumptionAverager restored = new Obd2ConsumptionAverager();
+            restoreStoredAverage(prefs, restored);
+            storedRangeAverage = restored.reliableValue();
+            storedRangeAveragePrefs = prefs;
+            storedRangeAverageCached = true;
+        }
+        return storedRangeAverage;
+    }
+
+    private static void restoreStoredAverage(SharedPreferences p, Obd2ConsumptionAverager target) {
+        if (target.restoreSnapshot(p.getString(KEY_AVG_WINDOW, null))) return;
+        target.restore(
                 Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_LITERS, Double.doubleToLongBits(0d))),
                 Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_KM, Double.doubleToLongBits(0d))));
-        return saved.value();
     }
 
     private synchronized Obd2ConsumptionAverager averageTotals(Context context) {
         Obd2ConsumptionAverager totals = new Obd2ConsumptionAverager();
         if (running) {
-            synchronized (averager) { totals.restore(averager.weightedLiters(), averager.weightedKm()); }
+            synchronized (averager) { totals.restoreSnapshot(averager.snapshot()); }
         } else {
-            SharedPreferences p = preferences(context);
-            totals.restore(Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_LITERS, Double.doubleToLongBits(0d))),
-                    Double.longBitsToDouble(p.getLong(KEY_AVG_WEIGHTED_KM, Double.doubleToLongBits(0d))));
+            restoreStoredAverage(preferences(context), totals);
         }
         return totals;
-    }
-
-    synchronized double reliableDisplayAverage(Context context) {
-        return averageTotals(context).reliableValue();
     }
 
     private void saveAverage() {
         if (averageStoreContext == null) return;
         synchronized (averager) {
-        preferences(averageStoreContext).edit()
-                .putLong(KEY_AVG_WEIGHTED_LITERS, Double.doubleToLongBits(averager.weightedLiters()))
-                .putLong(KEY_AVG_WEIGHTED_KM, Double.doubleToLongBits(averager.weightedKm()))
-                .apply();
+            SharedPreferences prefs = preferences(averageStoreContext);
+            prefs.edit()
+                    .putString(KEY_AVG_WINDOW, averager.snapshot())
+                    .remove(KEY_AVG_WEIGHTED_LITERS).remove(KEY_AVG_WEIGHTED_KM)
+                    .apply();
+            storedRangeAverage = averager.reliableValue();
+            storedRangeAveragePrefs = prefs;
+            storedRangeAverageCached = true;
         }
     }
 
@@ -220,10 +215,12 @@ final class Obd2Client {
         averageStoreContext = app;
         // v0.5.0: restore the running average instead of resetting it, so the figure keeps
         // accumulating across ignition cycles / app restarts - resetting it now would throw
-        // away everything learned before this restart. Use Einstellungen -> Verbrauch/OBD2
-        // to reset intentionally instead (Obd2Client.resetAverageConsumption).
+        // away everything learned before this restart.
         loadAverage(app);
-        veScale = savedVeScale(app);
+        // Remove the retired CAN-derived model correction. The OBD calculation now always
+        // uses its fixed, tested Speed-Density parameters.
+        preferences(app).edit().remove("ve_scale_bits")
+                .remove("avg_since_refuel_liters_bits").remove("avg_since_refuel_km_bits").apply();
         reconnectDelayMs = RECONNECT_DELAY_MS;
         averageLastSavedAtMs = 0L;
         lastSampleAtMs = 0L;
@@ -239,11 +236,37 @@ final class Obd2Client {
     synchronized void stop() {
         running = false;
         saveAverage();
-        if (thread != null) thread.interrupt();
+        Thread worker = thread;
+        if (worker != null) worker.interrupt();
         thread = null;
-        closeQuietly();
+
+        // BluetoothSocket.close() can block briefly on some China-headunit Bluetooth stacks.
+        // Detach the live references synchronously, but close the captured socket off the UI thread.
+        BluetoothSocket closing = socket;
+        socket = null;
+        in = null;
+        out = null;
         connected = false;
+        connectedAddress = null;
+        if (closing != null) {
+            Thread closer = new Thread(() -> closeSilently(closing), "obd2-socket-close");
+            closer.setDaemon(true);
+            closer.start();
+        }
         status = "Angehalten";
+    }
+
+    /**
+     * Head unit woke from standby: a socket from before the standby is dead or half-dead, and the
+     * adapter may have lost power with the ignition. Drop it and connect again right away.
+     */
+    void requestReconnect() {
+        if (!running) return;
+        long now = SystemClock.elapsedRealtime();
+        if (lastWakeReconnectAtMs != 0L && now - lastWakeReconnectAtMs < WAKE_RECONNECT_DEBOUNCE_MS) return;
+        lastWakeReconnectAtMs = now;
+        reconnectRequested = true;
+        DiagLog.add("OBD2: Neuverbindung nach Standby angefordert");
     }
 
     boolean isConnected() { return connected; }
@@ -264,14 +287,13 @@ final class Obd2Client {
                 + "Brauchbare Verbrauchsdaten: " + (connected && latestPollUsable && age >= 0 && age <= 15_000 ? "JA" : "NEIN / VERALTET") + "\n"
                 + "Letzte brauchbare Probe: " + (age < 0 ? "nie" : age / 1000 + " Sekunden her") + "\n"
                 + "Letzte PID-Werte: " + lastPidSummary + "\n"
-                + String.format(java.util.Locale.GERMANY, "OBD gesammelte Strecke: %.3f km\nOBD gesammelter Kraftstoff: %.4f L\n",
-                        totals.weightedKm(), totals.weightedLiters())
-                + "OBD Durchschnitts-Startphase: " + (totals.weightedKm() >= Obd2ConsumptionAverager.DISPLAY_MIN_KM
-                        ? "abgeschlossen" : "unter 1 km / Anzeige wartet") + "\n"
                 + String.format(java.util.Locale.GERMANY,
-                        "OBD Schubabschaltung geschätzt: %s (%d von %d Runden)\nOBD Modellkorrektur (aus CAN-Tank gelernt): Faktor %.3f\n",
-                        dfcoEnabled(context) ? "AN" : "AUS", roundsFuelCut, roundsTotal, veScale(context))
-                + "OBD Summenquelle: " + (running ? "laufend, inkl. gespeicherter Grundlage" : "gespeicherte Grundlage") + "\n";
+                        "Adaptives Reichweitenfenster: %.3f / 100 km\nKraftstoff im Reichweitenfenster: %.4f L\n",
+                        totals.weightedKm(), totals.weightedLiters())
+                + String.format(java.util.Locale.GERMANY,
+                        "OBD Schubabschaltung geschätzt: %s (%d von %d Runden)\n",
+                        dfcoEnabled(context) ? "AN" : "AUS", roundsFuelCut, roundsTotal)
+                + "Reichweitenquelle: " + (running ? "laufendes Fahrprofil" : "gespeichertes Fahrprofil") + "\n";
     }
 
     /**
@@ -287,6 +309,12 @@ final class Obd2Client {
     private void runLoop(Context context) {
         while (running && thread == Thread.currentThread()) {
             try {
+                if (reconnectRequested) {
+                    reconnectRequested = false;
+                    reconnectDelayMs = RECONNECT_DELAY_MS;
+                    noDataRestartMs = NO_DATA_RESTART_MS;
+                    if (connected) { closeQuietly(); connected = false; }
+                }
                 if (connected && !java.util.Objects.equals(connectedAddress, deviceAddress(context))) {
                     closeQuietly();
                     connected = false;
@@ -301,6 +329,11 @@ final class Obd2Client {
                     reconnectDelayMs = RECONNECT_DELAY_MS;
                 }
                 pollOnce(context);
+                long sinceData = SystemClock.elapsedRealtime() - Math.max(connectedAtElapsed, lastUsableElapsed);
+                if (sinceData > noDataRestartMs) {
+                    noDataRestartMs = Math.min(NO_DATA_RESTART_MAX_MS, noDataRestartMs * 2);
+                    throw new IOException("keine brauchbaren Daten seit " + sinceData / 1000L + " s, Adapter wird neu initialisiert");
+                }
                 heartbeatIfDue();
                 sleep(POLL_INTERVAL_MS);
             } catch (IOException lost) {
@@ -337,7 +370,7 @@ final class Obd2Client {
         long end = SystemClock.elapsedRealtime() + ms;
         while (running && thread == Thread.currentThread()) {
             long left = end - SystemClock.elapsedRealtime();
-            if (left <= 0) return;
+            if (left <= 0 || reconnectRequested) return;
             if (!java.util.Objects.equals(address, deviceAddress(context))) {
                 reconnectDelayMs = RECONNECT_DELAY_MS;
                 return;
@@ -385,7 +418,7 @@ final class Obd2Client {
             try {
                 s = device.createRfcommSocketToServiceRecord(SPP_UUID);
                 socket = s; // Allow stop() to cancel a blocking connect.
-                s.connect();
+                guardedConnect(s);
             } catch (IOException direct) {
                 // Some ELM327 clones fail the standard SDP-based socket but accept
                 // the well-known reflective channel-1 fallback used by most OBD apps.
@@ -393,7 +426,7 @@ final class Obd2Client {
                 if (!running || thread != Thread.currentThread()) return false;
                 s = fallbackSocket(device);
                 socket = s;
-                s.connect();
+                guardedConnect(s);
             }
             if (!running || thread != Thread.currentThread()) { closeSilently(s); return false; }
             socket = s;
@@ -403,6 +436,9 @@ final class Obd2Client {
             connected = true;
             connectedAddress = address;
             lastSampleAtMs = 0L; // Never integrate the disconnected interval.
+            timeoutStreak = 0;
+            connectedAtElapsed = SystemClock.elapsedRealtime();
+            firstPollAfterConnect = true;
             status = "Verbunden";
             DiagLog.add("OBD2: verbunden mit " + address);
             probeSupportedPids();
@@ -419,6 +455,26 @@ final class Obd2Client {
             closeQuietly();
             return false;
         }
+    }
+
+    /**
+     * BluetoothSocket.connect() has no timeout and can hang for minutes on some head-unit stacks
+     * (adapter powered down, stack mid-restart). While it hangs the single OBD thread is stuck and
+     * no data ever arrives until the app is restarted. A watchdog closes the socket, which makes
+     * connect() throw so the normal retry/backoff takes over.
+     */
+    private void guardedConnect(BluetoothSocket s) throws IOException {
+        final java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread watchdog = new Thread(() -> {
+            try { Thread.sleep(CONNECT_TIMEOUT_MS); } catch (InterruptedException e) { return; }
+            if (finished.get()) return;
+            DiagLog.add("OBD2: Verbindungsaufbau hängt seit " + CONNECT_TIMEOUT_MS / 1000L + " s, wird abgebrochen");
+            closeSilently(s);
+        }, "obd2-connect-watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
+        try { s.connect(); }
+        finally { finished.set(true); watchdog.interrupt(); }
     }
 
     private BluetoothSocket fallbackSocket(BluetoothDevice device) throws Exception {
@@ -439,13 +495,13 @@ final class Obd2Client {
     /** One-time per connection: asks the ECU itself which PIDs it supports (0x01-0x20 and 0x21-0x40). */
     private void probeSupportedPids() {
         try {
-            String raw1 = sendAndLog("0100", CMD_TIMEOUT_MS);
+            String raw1 = sendAndLog("0100", SEARCH_TIMEOUT_MS);
             int[] data1 = Obd2PidDecoder.dataBytes(raw1, "00");
             if (data1 == null) {
                 DiagLog.add("OBD2 Support-Check 0100: keine auswertbare Antwort ("
                         + Obd2PidDecoder.cleanLine(raw1) + ") - ECU antwortet ggf. auf anderes Protokoll/Header");
             }
-            String raw2 = sendAndLog("0120", CMD_TIMEOUT_MS);
+            String raw2 = sendAndLog("0120", SEARCH_TIMEOUT_MS);
             int[] data2 = Obd2PidDecoder.dataBytes(raw2, "20");
 
             DiagLog.add(String.format(java.util.Locale.GERMANY,
@@ -454,7 +510,9 @@ final class Obd2Client {
                     describeSupport(data1, 0x0B, 0x01), describeSupport(data1, 0x0F, 0x01),
                     describeSupport(data1, 0x10, 0x01), describeSupport(data2, 0x2F, 0x21)));
         } catch (IOException e) {
-            DiagLog.add("OBD2 Support-Check fehlgeschlagen: " + e.getMessage());
+            DiagLog.add("OBD2 Support-Check fehlgeschlagen: " + e.getMessage()
+                    + " (Verbindung bleibt bestehen)");
+            try { resyncInput(); } catch (IOException ignored) {}
         }
     }
 
@@ -464,10 +522,12 @@ final class Obd2Client {
     }
 
     private void pollOnce(Context context) throws IOException {
-        String rpmRaw = sendAndRead("010C", CMD_TIMEOUT_MS);
-        String speedRaw = sendAndRead("010D", CMD_TIMEOUT_MS);
-        String mapRaw = sendAndRead("010B", CMD_TIMEOUT_MS);
-        String iatRaw = sendAndRead("010F", CMD_TIMEOUT_MS);
+        long cmdTimeout = firstPollAfterConnect ? SEARCH_TIMEOUT_MS : CMD_TIMEOUT_MS;
+        String rpmRaw = pollRead("010C", cmdTimeout);
+        String speedRaw = pollRead("010D", cmdTimeout);
+        String mapRaw = pollRead("010B", cmdTimeout);
+        String iatRaw = pollRead("010F", cmdTimeout);
+        firstPollAfterConnect = false;
 
         // Log raw replies periodically (every round for the first minute, then every 10th)
         // so a live drive doesn't get buried, but the first, most important rounds are complete.
@@ -503,7 +563,7 @@ final class Obd2Client {
         double iatC = Obd2PidDecoder.intakeAirTempC(iatData);
         double mafEquivalent = rpm >= 0
                 ? Obd2PidDecoder.mafEquivalentFromMap(mapKpa, rpm, DISPLACEMENT_LITERS,
-                        VOLUMETRIC_EFFICIENCY * veScale, iatC)
+                        VOLUMETRIC_EFFICIENCY, iatC)
                 : Double.NaN;
         double lph = Obd2PidDecoder.literPerHourFromMaf(mafEquivalent);
         // Overrun: the model sees air, but the injectors are (very probably) off.
@@ -527,7 +587,11 @@ final class Obd2Client {
         completedPolls++;
         latestPollUsable = Double.isFinite(lph) && Double.isFinite(speedKmh);
         if (!latestPollUsable) lastSampleAtMs = 0;
-        if (latestPollUsable) lastUsableAtMs = lastReplyAtMs;
+        if (latestPollUsable) {
+            lastUsableAtMs = lastReplyAtMs;
+            lastUsableElapsed = sampleAt;
+            noDataRestartMs = NO_DATA_RESTART_MS;
+        }
         synchronized (averager) {
         if (Double.isFinite(lph)) averager.add(lph, speedKmh, elapsedSeconds);
         // Saved periodically, not just on a clean stop(): an abrupt process kill (forced
@@ -548,7 +612,9 @@ final class Obd2Client {
             s.obdFuelLitersPerHour = lph;
             s.obdSpeedKmh = speedKmh;
             s.obdRpm = rpm;
-            s.avgConsumption = Double.isFinite(lph) && Double.isFinite(speedKmh) ? averager.value() : Double.NaN;
+            // Dashboard "Ø 100 KM" and range both use the persisted rolling 100-km profile.
+            s.rangeConsumption = Double.isFinite(lph) && Double.isFinite(speedKmh)
+                    ? averager.reliableValue() : Double.NaN;
             s.instConsumptionUpdatedAtMs = VehicleRepository.now();
             VehicleRepository.touch("OBD2");
         }
@@ -556,6 +622,31 @@ final class Obd2Client {
         // No forced reconnect just because MAP/IAT come back "NO DATA" or out of range:
         // that is a valid adapter/ECU answer, not a lost link (see class Javadoc). A real
         // link problem still surfaces as an IOException from sendAndRead() itself.
+    }
+
+    /**
+     * A poll command that merely times out (ECU busy, adapter still searching, one lost
+     * Bluetooth packet) must not tear down a healthy link and force a full re-init - that is
+     * what made the consumption vanish for several seconds. It counts as "no data" instead;
+     * only a streak of timeouts or a real I/O error drops the connection.
+     */
+    private String pollRead(String command, long timeoutMs) throws IOException {
+        try {
+            String raw = sendAndRead(command, timeoutMs);
+            timeoutStreak = 0;
+            return raw;
+        } catch (IOException e) {
+            if (!"Zeitüberschreitung bei Antwort".equals(e.getMessage())) throw e;
+            timeoutStreak++;
+            if (timeoutStreak >= MAX_TIMEOUT_STREAK) {
+                timeoutStreak = 0;
+                throw e;
+            }
+            logRepeated("pollTimeout", "OBD2: " + command + " ohne Antwort (" + timeoutStreak + "/"
+                    + MAX_TIMEOUT_STREAK + "), Verbindung bleibt bestehen");
+            resyncInput();
+            return "";
+        }
     }
 
     private void heartbeatIfDue() {
@@ -616,7 +707,9 @@ final class Obd2Client {
 
     private String readUntilPrompt(InputStream input, long timeoutMs) throws IOException {
         StringBuilder sb = new StringBuilder();
-        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        long startedAt = SystemClock.elapsedRealtime();
+        long deadline = startedAt + timeoutMs;
+        boolean searchExtended = false;
         byte[] buf = new byte[128];
         while (SystemClock.elapsedRealtime() < deadline) {
             if (!running || thread != Thread.currentThread()) throw new IOException("OBD2-Thread angehalten");
@@ -628,6 +721,11 @@ final class Obd2Client {
                 if (sb.length() > MAX_REPLY_CHARS)
                     throw new IOException("Adapterantwort zu groß / Prompt fehlt");
                 if (sb.indexOf(">") >= 0) return sb.toString();
+                // "SEARCHING..." = protocol auto-detection in progress, can take several seconds.
+                if (!searchExtended && sb.indexOf("SEARCHING") >= 0) {
+                    searchExtended = true;
+                    deadline = Math.max(deadline, startedAt + SEARCH_TIMEOUT_MS + 2_000L);
+                }
             } else {
                 try { Thread.sleep(15); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); throw new IOException("Unterbrochen"); }
             }
@@ -648,6 +746,13 @@ final class Obd2Client {
 
     private void closeSilently(BluetoothSocket s) {
         if (s == null) return;
-        try { s.close(); } catch (IOException ignored) {}
+        // close() can block for a long time on some head-unit Bluetooth stacks. Never let it hold
+        // the OBD thread: close on a helper thread and wait at most one second for it.
+        Thread closer = new Thread(() -> {
+            try { s.close(); } catch (IOException | RuntimeException ignored) {}
+        }, "obd2-socket-close");
+        closer.setDaemon(true);
+        closer.start();
+        try { closer.join(1_000L); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 }

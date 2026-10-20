@@ -29,14 +29,6 @@ public final class Obd2PidDecoderTest {
         int[] speedData = Obd2PidDecoder.dataBytes("41 0D 50", "0D");
         eq(80d, Obd2PidDecoder.speedKmh(speedData), 1e-9, "Speed decode");
 
-        // 0110 -> 41 10 04 4C : MAF = (0x04*256+0x4C)/100 = (1024+76)/100 = 11.00 g/s
-        int[] mafData = Obd2PidDecoder.dataBytes("41 10 04 4C", "10");
-        eq(11.00d, Obd2PidDecoder.mafGs(mafData), 1e-6, "MAF decode");
-
-        // 012F -> 41 2F 80 : fuel = 128*100/255 = 50.196...
-        int[] fuelData = Obd2PidDecoder.dataBytes("41 2F 80", "2F");
-        eq(50.196d, Obd2PidDecoder.fuelPercent(fuelData), 1e-2, "Fuel percent decode");
-
         // Consumption formula: 11 g/s MAF -> l/h -> l/100km at 80 km/h.
         // l/h = (mafGs*3600)/(14.7*720) = (11*3600)/10584 = 3.74150 l/h.
         double lph = Obd2PidDecoder.literPerHourFromMaf(11.00d);
@@ -71,12 +63,8 @@ public final class Obd2PidDecoderTest {
 
         // Implausible/out-of-range values are rejected rather than silently clamped.
         eq(-1, Obd2PidDecoder.rpm(new int[]{0xFF, 0xFF}), "Implausible RPM rejected");
-        // The two-byte MAF PID can never exceed 655.35 g/s (0xFFFF/100); confirm that
-        // maximum-byte reading is still accepted rather than spuriously rejected.
-        eq(655.35d, Obd2PidDecoder.mafGs(new int[]{0xFF, 0xFF}), 1e-6, "Maximum-byte MAF still accepted");
-        // dataBytes() does not reject by length itself; rpm()/mafGs() require 2 bytes each.
+        // dataBytes() does not reject by length itself; rpm() requires 2 bytes.
         eq(-1, Obd2PidDecoder.rpm(new int[]{0x1A}), "Single-byte RPM payload rejected");
-        nan(Obd2PidDecoder.mafGs(new int[]{0x04}), "Single-byte MAF payload rejected");
 
         // Supported-PID bitmap decoding (0100/0120 style responses).
         int[] allSupported = {0xFF, 0xFF, 0xFF, 0xFF};

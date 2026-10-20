@@ -15,9 +15,11 @@ final class FallbackLocationFeed {
     private final GpsFollowFilter filter = new GpsFollowFilter();
     private final LocationListener listener;
     private Consumer<Location> consumer;
+    private Consumer<Location> rawConsumer;
     private Location lastLocation;
     private long lastGpsReceivedMs;
     private boolean running;
+    private long fixesSeen;
 
     FallbackLocationFeed(Context context) {
         this.context = context;
@@ -27,32 +29,46 @@ final class FallbackLocationFeed {
         };
     }
 
-    void setConsumer(Consumer<Location> value) { consumer = value; }
+    void setConsumer(Consumer<Location> value) {
+        if ((consumer == null) != (value == null)) MapFollowDiagnostics.event("GPS-Empfänger " + (value == null ? "ENTFERNT" : "gesetzt"));
+        consumer = value;
+    }
+    void setRawConsumer(Consumer<Location> value) { rawConsumer = value; }
     Location currentLocation() { return lastLocation == null ? null : new Location(lastLocation); }
 
     void start() {
         if (running || manager == null || !LocationAccess.any(context)) return;
-        try {
-            Location gps = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            Location network = manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-            if (recent(gps, 15_000L)) accept(gps);
-            else if (recent(network, 15_000L)) accept(network);
-            if (LocationAccess.fine(context) && manager.isProviderEnabled(LocationManager.GPS_PROVIDER))
-                manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener);
-            if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
-                manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 0f, listener);
-            running = true;
-        } catch (SecurityException ignored) {}
+
+        // Approximate-only permission must never make the GPS_PROVIDER exception abort the
+        // NETWORK_PROVIDER fallback. Resolve and subscribe to each provider independently.
+        Location gps = LocationAccess.lastKnownGps(context, manager);
+        Location network = LocationAccess.lastKnownNetwork(context, manager);
+        if (recent(gps, 15_000L)) accept(gps);
+        else if (recent(network, 15_000L)) accept(network);
+
+        if (LocationAccess.fine(context)
+                && LocationAccess.providerEnabled(manager, LocationManager.GPS_PROVIDER)) {
+            try { manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener); }
+            catch (SecurityException ignored) {}
+        }
+        if (LocationAccess.providerEnabled(manager, LocationManager.NETWORK_PROVIDER)) {
+            try { manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 0f, listener); }
+            catch (SecurityException ignored) {}
+        }
+        running = true;
+        MapFollowDiagnostics.feedRestart();
+        MapFollowDiagnostics.event("GPS gestartet");
     }
 
     void stop() {
+        if (running) MapFollowDiagnostics.event("GPS gestoppt");
         if (manager != null && running) {
             try { manager.removeUpdates(listener); } catch (SecurityException ignored) {}
         }
         running = false;
     }
 
-    void destroy() { stop(); consumer = null; }
+    void destroy() { stop(); consumer = null; rawConsumer = null; }
 
     private void accept(Location location) {
         if (location == null || ((location.getElapsedRealtimeNanos() > 0L || location.getTime() > 0L)
@@ -62,10 +78,17 @@ final class FallbackLocationFeed {
                 && lastGpsReceivedMs > 0L && now - lastGpsReceivedMs < 8_000L) return;
         if (lastLocation != null && !newerThan(location, lastLocation)) return;
         if (LocationManager.GPS_PROVIDER.equals(location.getProvider())) lastGpsReceivedMs = now;
+        MapFollowDiagnostics.rawFix();
+        if (++fixesSeen % 20 == 1) MapFollowDiagnostics.event("GPS-Fix #" + fixesSeen + (consumer == null ? " (ohne Empfänger)" : ""));
+        Consumer<Location> raw = rawConsumer;
+        if (raw != null) raw.accept(new Location(location));
         Location cameraFix = filter.update(location);
         if (cameraFix == null) return;
         lastLocation = new Location(cameraFix);
-        if (consumer != null) consumer.accept(new Location(cameraFix));
+        MapFollowDiagnostics.cameraFix();
+        Consumer<Location> target = consumer;
+        if (target != null) target.accept(new Location(cameraFix));
+        else MapFollowDiagnostics.noConsumer();
     }
 
     private static boolean newerThan(Location next, Location previous) {

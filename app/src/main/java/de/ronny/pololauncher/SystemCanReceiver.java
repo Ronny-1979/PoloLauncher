@@ -10,10 +10,8 @@ import android.os.Parcelable;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -23,10 +21,9 @@ import java.util.concurrent.TimeUnit;
  * by {@link HctOemAutoPoller}) and does not communicate with the OEM "Fahrzeug" app.
  *
  * <p>The receiver is registered as exported because the vendor apps send unprotected broadcasts,
- * so any app can reach it. Therefore: the whole {@link #onReceive} body is guarded, and the
- * generic key-name heuristics ({@link #applyNumeric}/{@link #applyBoolean}) are OFF unless the
- * user switches on "Sniffer-Heuristik" in the diagnostics settings. Confirmed frames
- * ({@code com.microntek.sync}, exact known actions) are always decoded.</p>
+ * so any app can reach it. Therefore the whole {@link #onReceive} body is guarded. Vehicle values
+ * are changed only by confirmed HCT frames and exact known broadcast actions. Unknown vendor
+ * objects remain diagnostic-only and never overwrite vehicle values.</p>
  */
 public final class SystemCanReceiver extends BroadcastReceiver {
     /** Vendor Parcelable reflection must never hold Android's broadcast/main thread. */
@@ -36,11 +33,11 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         t.setDaemon(true);
         return t;
     }, new ThreadPoolExecutor.DiscardOldestPolicy());
-    /** Diagnostic-only switch, see class comment. Refreshed from preferences on every broadcast. */
-    static final String PREFS_DEBUG = "cockpit_debug";
-    static final String KEY_SNIFFER = "heuristic_sniffer";
     private static final long FAILURE_LOG_INTERVAL_MS = 10_000L;
-    volatile boolean heuristicSniffer;
+    private static final int MAX_TOP_LEVEL_EXTRAS = 64;
+    private static final int MAX_GENERIC_LOG_CHARS = 4_096;
+    private static final int MAX_VENDOR_BYTE_ARRAY = 4_096;
+    private long lastOversizeArrayLogAt;
     private long lastFailureLogAt;
     private boolean registered;
     private final HctSyncDecoder hctSync = new HctSyncDecoder();
@@ -91,26 +88,6 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         DiagLog.add("Passiver HCT/Microntek-Empfänger aktiv (" + actions.size() + " Actions)");
     }
 
-    public synchronized void addActions(Context context, Collection<String> more) {
-        if (more == null || more.isEmpty()) return;
-        int before = actions.size();
-        for (String a : more) if (isPlausibleAction(a)) actions.add(a);
-        if (actions.size() == before) return;
-        Context app = context.getApplicationContext();
-        if (registered) {
-            try { app.unregisterReceiver(this); } catch (Throwable ignored) {}
-            registered = false;
-        }
-        register(app);
-        DiagLog.add("Sniffer erweitert: " + before + " -> " + actions.size() + " Actions");
-    }
-
-    public synchronized int actionCount() { return actions.size(); }
-    public synchronized Set<String> actionSnapshot() { return new LinkedHashSet<>(actions); }
-    public String syncSummary() { return hctSync.summary(); }
-    public long syncPacketCount() { return hctSync.validPacketCount(); }
-    public int lastDoorMask() { return hctSync.lastDoorMask(); }
-
     public synchronized void stop(Context context) {
         if (!registered) return;
         try { context.getApplicationContext().unregisterReceiver(this); } catch (Exception ignored) {}
@@ -136,8 +113,6 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         // Runs on the main thread and is reachable by other apps: a malformed extra (for example
         // a Parcelable class that cannot be unparcelled) must never crash the launcher process.
         try {
-            heuristicSniffer = context != null
-                    && context.getSharedPreferences(PREFS_DEBUG, Context.MODE_PRIVATE).getBoolean(KEY_SNIFFER, false);
             handleBroadcast(intent);
         } catch (Throwable failure) {
             long now = android.os.SystemClock.uptimeMillis();
@@ -162,10 +137,21 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         StringBuilder line = logGeneric ? new StringBuilder("BROADCAST ").append(action) : null;
         if (extras != null && !extras.isEmpty()) {
             consumeKnownBroadcast(action, extras);
+            int visited = 0;
             for (String key : extras.keySet()) {
+                if (visited++ >= MAX_TOP_LEVEL_EXTRAS) {
+                    if (line != null) line.append(" | …weitere Extras verworfen");
+                    break;
+                }
                 Object value;
                 try { value = extras.get(key); } catch (Throwable t) { continue; }
-                if (line != null) line.append(" | ").append(key).append('=').append(describe(value));
+                if (line != null && line.length() < MAX_GENERIC_LOG_CHARS) {
+                    line.append(" | ").append(key).append('=').append(describe(value));
+                    if (line.length() > MAX_GENERIC_LOG_CHARS) {
+                        line.setLength(MAX_GENERIC_LOG_CHARS);
+                        line.append("…");
+                    }
+                }
                 consume(key, value, action);
             }
         } else if (line != null) {
@@ -202,8 +188,8 @@ public final class SystemCanReceiver extends BroadcastReceiver {
                 if (n != null && n >= 0 && n < 10000) {
                     int rpm = (int)Math.round(n);
                     synchronized (VehicleRepository.class) {
-                        VehicleRepository.mutable().rpm = rpm;
-                        VehicleRepository.mutable().rpmUpdatedAtMs = VehicleRepository.now();
+                        VehicleRepository.logRpmAtStandstill("Broadcast", rpm, VehicleRepository.mutable());
+                        VehicleRepository.mutable().noteRpm(rpm, VehicleRepository.now());
                         VehicleRepository.touch("HCT RPM Broadcast");
                     }
                     if (lastLoggedRpm == Integer.MIN_VALUE || Math.abs(rpm - lastLoggedRpm) >= 100) {
@@ -217,7 +203,11 @@ public final class SystemCanReceiver extends BroadcastReceiver {
                 Object v = extras.get("speed");
                 Double n = numberFrom(v);
                 if (n != null && n >= 0 && n < 400) {
-                    // Diagnostic line only: the dashboard uses GPS/OBD speed, not this value.
+                    synchronized (VehicleRepository.class) {
+                        VehicleRepository.mutable().speedKmh = n;
+                        VehicleRepository.mutable().speedUpdatedAtMs = VehicleRepository.now();
+                        VehicleRepository.touch("HCT SPEED Broadcast");
+                    }
                     if (Double.isNaN(lastLoggedSpeed) || Math.abs(n - lastLoggedSpeed) >= 1.0) {
                         lastLoggedSpeed = n;
                         DiagLog.add(String.format(Locale.GERMANY, "HCT SPEED=%.1f km/h  (com.microntek.canbus.speed)", n));
@@ -267,6 +257,14 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         if (value == null) return;
         if (value instanceof byte[]) {
             byte[] bytes = (byte[]) value;
+            if (bytes.length > MAX_VENDOR_BYTE_ARRAY) {
+                long now = android.os.SystemClock.uptimeMillis();
+                if (now - lastOversizeArrayLogAt >= FAILURE_LOG_INTERVAL_MS) {
+                    lastOversizeArrayLogAt = now;
+                    DiagLog.add("Broadcast-Bytearray verworfen: " + bytes.length + " Bytes");
+                }
+                return;
+            }
             if ("com.microntek.sync".equals(action) || "syncdata".equalsIgnoreCase(key)) {
                 if (serial.pending() || (bytes.length > 0 && (bytes[0] & 0xff) == 0x2e))
                     serial.feed(bytes);
@@ -288,73 +286,12 @@ public final class SystemCanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // Unknown vendor getters can perform Binder work, so vendor objects are only ever inspected
-        // on the bounded worker (fields only). The bounded queue also prevents a broadcast storm
-        // from growing memory forever.
+        // Unknown vendor objects may still be inspected diagnostically on the bounded worker.
+        // Their field names are never guessed into VehicleRepository.
         final boolean vendorObject = value instanceof Parcelable
                 || value.getClass().getName().startsWith("android.microntek")
                 || value.getClass().getName().startsWith("com.microntek");
-        // Everything below guesses meaning from key names and is therefore diagnostic-only.
-        if (!heuristicSniffer) {
-            if (vendorObject) VENDOR_INSPECTOR.execute(() -> inspectVendorObject(key, value));
-            return;
-        }
-        String k = ((action == null ? "" : action) + "." + (key == null ? "" : key)).toLowerCase(Locale.ROOT);
-        if ("com.canbus.temperature".equals(action) && key != null && key.toLowerCase(Locale.ROOT).contains("temperature")) {
-            Double n = numberFrom(value);
-            if (n != null && n > -80 && n < 100) {
-                synchronized (VehicleRepository.class) {
-                    VehicleRepository.mutable().outsideC = n;
-                    VehicleRepository.mutable().outsideUpdatedAtMs = VehicleRepository.now();
-                    VehicleRepository.touch("Broadcast Temperatur");
-                }
-            }
-            return;
-        }
-
-        Double n = numberFrom(value);
-        if (n != null) applyNumeric(k, n);
-        Boolean bool = booleanFrom(value);
-        if (bool != null) applyBoolean(k, bool);
-
         if (vendorObject) VENDOR_INSPECTOR.execute(() -> inspectVendorObject(key, value));
-    }
-
-    /** Guessing decoder for unknown broadcasts; only reachable in sniffer mode. */
-    private void applyNumeric(String k, double n) {
-        synchronized (VehicleRepository.class) {
-        VehicleState s = VehicleRepository.mutable(); boolean hit = true;
-        long signalNow = VehicleRepository.now();
-        if (containsAny(k,"rpm","engine_speed","revolution","tach") && n >= 0 && n < 10000) { s.rpm=(int)Math.round(n); s.rpmUpdatedAtMs=signalNow; }
-        else if (containsAny(k,"odometer","mileage","odo","kilometer","km_total") && n > 0 && n < 2_000_000) { s.odometerKm=Math.round(n); s.odometerUpdatedAtMs=signalNow; }
-        // Check level/percent before litres: "fuel_level" also contains "fuel_l".
-        else if (containsAny(k,"fuel_percent","tank_percent","fuellevel","fuel_level","tank_level") && n >= 0 && n <= 100) {
-            s.fuelPercent=n;
-            s.fuelLiters=VehicleRepository.POLO_6R_TANK_LITERS*n/100.0;
-            s.fuelUpdatedAtMs=signalNow;
-        }
-        else if (containsAny(k,"fuel_liter","tank_liter","fuelvolume","fuel_volume","fuel_l") && n >= 0 && n <= 60) { s.fuelLiters=n; s.fuelUpdatedAtMs=signalNow; }
-        else if (containsAny(k,"outside","ambient","out_temp","exterior_temp") && n > -80 && n < 100) { s.outsideC=n; s.outsideUpdatedAtMs=signalNow; }
-        else if (containsAny(k,"voltage","battery_voltage","batt_vol") && n >= 5 && n <= 20) { s.voltage=n; s.voltageUpdatedAtMs=signalNow; }
-        else hit=false;
-        if(hit) VehicleRepository.touch("Broadcast " + k);
-        }
-    }
-
-    private void applyBoolean(String k, boolean v) {
-        synchronized (VehicleRepository.class) {
-        VehicleState s=VehicleRepository.mutable(); boolean hit=true;
-        long signalNow=VehicleRepository.now();
-        if (containsAny(k,"front_left","door_fl","left_front","fl_door","doorlf","lfdoor")){s.doorFL=v;s.doorsKnown=true;s.doorsUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"front_right","door_fr","right_front","fr_door","doorrf","rfdoor")){s.doorFR=v;s.doorsKnown=true;s.doorsUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"rear_left","back_left","door_rl","left_rear","rl_door","doorlr","lrdoor")){s.doorRL=v;s.doorsKnown=true;s.doorsUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"rear_right","back_right","door_rr","right_rear","rr_door","doorrR","rrdoor")){s.doorRR=v;s.doorsKnown=true;s.doorsUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"trunk","boot","tailgate","back_door")){s.trunk=v;s.trunkKnown=true;s.doorsUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"seatbelt","seat_belt","belt")){s.seatbeltOpen=v;s.seatbeltKnown=true;s.seatbeltUpdatedAtMs=signalNow;}
-        else if(containsAny(k,"washer")){s.washerLow=v;s.washerKnown=true;s.washerUpdatedAtMs=signalNow;}
-        else hit=false;
-        if(hit) VehicleRepository.touch("Broadcast " + k);
-        }
     }
 
     private void inspectVendorObject(String key, Object obj) {
@@ -386,28 +323,15 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         return v instanceof Boolean || v instanceof Number || v instanceof String || (v != null && v.getClass().isPrimitive());
     }
 
-    private static boolean containsAny(String s,String... words){for(String w:words)if(s.contains(w.toLowerCase(Locale.ROOT)))return true;return false;}
     private static Double numberFrom(Object o){
         if(o instanceof Number)return ((Number)o).doubleValue();
         if(o instanceof String){String raw=(String)o;if(raw.length()>64)return null;String x=raw.replace(',','.').replaceAll("[^0-9+\\-.]","");if(!x.isEmpty())try{return Double.parseDouble(x);}catch(Exception ignored){}}
         return null;
     }
-    private static Boolean booleanFrom(Object o) {
-        if (o instanceof Boolean) return (Boolean)o;
-        if (o instanceof Byte || o instanceof Short || o instanceof Integer || o instanceof Long) {
-            long n=((Number)o).longValue(); if(n==0)return false; if(n==1)return true;
-        }
-        if (o instanceof String) {
-            String s=((String)o).trim().toLowerCase(Locale.ROOT);
-            if(s.equals("true")||s.equals("open")||s.equals("opened")||s.equals("on"))return true;
-            if(s.equals("false")||s.equals("close")||s.equals("closed")||s.equals("off"))return false;
-        }
-        return null;
-    }
     private static String describe(Object v){
         if(v==null)return "null";
         if(v instanceof byte[])return "["+Hex.of((byte[])v)+"]";
-        if(v instanceof Bundle)return "Bundle("+((Bundle)v).keySet().size()+" Einträge)";
+        if(v instanceof Bundle)return "Bundle";
         if(v instanceof CharSequence){String s=v.toString();return s.length()<=160?s:s.substring(0,160)+"…";}
         if(v instanceof Number||v instanceof Boolean||v instanceof Character)return String.valueOf(v);
         if(v.getClass().isArray()){
@@ -418,10 +342,5 @@ public final class SystemCanReceiver extends BroadcastReceiver {
         // Vendor Parcelable.toString() is not trusted: it may perform Binder work or
         // create a huge dump. Reflection of relevant scalar fields runs on the bounded worker.
         return "<"+v.getClass().getName()+">";
-    }
-    private static boolean isPlausibleAction(String a){
-        if(a==null||a.length()<5||a.length()>180||a.indexOf('.')<1)return false;
-        for(int i=0;i<a.length();i++){char c=a.charAt(i);if(!(Character.isLetterOrDigit(c)||c=='.'||c=='_'||c=='-' ))return false;}
-        return true;
     }
 }
