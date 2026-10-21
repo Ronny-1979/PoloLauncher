@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.126 / versionCode 207**. Basis v0.31.125.
+- Weihnachtsschlitten: der Weihnachtsmann ist jetzt als Gestalt mit roter Zipfelmütze und weißem Bommel gezeichnet statt als Kreis-Ziel. Sonst unverändert.
+
 - Version: **0.31.125 / versionCode 206**. Basis v0.31.124.
 - Neu im Menü Karte: „Positionsmarke“ zum Umschalten zwischen dem blauen Standard-Punkt, einem Halloween-Kürbis und dem Weihnachtsschlitten (von oben gesehen, dreht sich mit dem GPS-Kurs, wenn Norden oben steht). Die Marken werden im Code gezeichnet (keine Bilddateien). Eine unbekannte oder fehlende Einstellung ergibt den Standard-Punkt. Die Wahl gilt, sobald man zur Hauptseite zurückkehrt.
 

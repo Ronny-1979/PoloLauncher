@@ -1,4 +1,4 @@
-# Testbericht v0.31.125 (wöchentliche Karten-Update-Prüfung mit Popup)
+# Testbericht v0.31.126 (wöchentliche Karten-Update-Prüfung mit Popup)
 
 Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
 

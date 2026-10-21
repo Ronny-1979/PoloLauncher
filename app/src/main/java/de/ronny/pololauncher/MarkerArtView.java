@@ -146,12 +146,21 @@ final class MarkerArtView extends View {
         fill.setColor(Color.rgb(46, 160, 67));
         rect.set(15 * u, 38 * u, 19 * u, 42 * u);
         c.drawRect(rect, fill);
-        // Santa seen from above: red hat, white rim, pompom
+        // Santa seen from above: shoulders, red hat bent backwards with a white pompom
+        fill.setColor(Color.rgb(150, 20, 28));
+        rect.set(11 * u, 17 * u, 23 * u, 27.5f * u);
+        c.drawRoundRect(rect, 4 * u, 4 * u, fill);
         fill.setColor(Color.rgb(250, 250, 250));
-        c.drawCircle(17 * u, 22 * u, 6.2f * u, fill);
+        c.drawCircle(17 * u, 20.5f * u, 4.6f * u, fill);
         fill.setColor(Color.rgb(235, 40, 45));
-        c.drawCircle(17 * u, 22 * u, 4.4f * u, fill);
+        path.reset();
+        path.moveTo(12.6f * u, 19.5f * u);
+        path.quadTo(17 * u, 12.5f * u, 21.4f * u, 19.5f * u);
+        path.quadTo(21 * u, 24.5f * u, 17 * u, 27 * u);
+        path.quadTo(13 * u, 24.5f * u, 12.6f * u, 19.5f * u);
+        path.close();
+        c.drawPath(path, fill);
         fill.setColor(Color.rgb(250, 250, 250));
-        c.drawCircle(17 * u, 22 * u, 1.5f * u, fill);
+        c.drawCircle(17 * u, 27.5f * u, 2f * u, fill);
     }
 }
