@@ -29,6 +29,7 @@ final class MapPreferences {
     private static final String LAST_ZOOM = "last_known_zoom";
     private static final String LAST_AREA = "last_known_area";
     private static final String HEADING_UP = "heading_up";
+    private static final String MARKER_STYLE = "position_marker_style";
     private static final String COLOR_MODE = "color_mode";
 
     private MapPreferences() {}
@@ -196,5 +197,16 @@ final class MapPreferences {
 
     static void setHeadingUp(Context context, boolean enabled) {
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit().putBoolean(HEADING_UP, enabled).apply();
+    }
+
+    /** Look of the position marker (see {@link MarkerStyle}); unknown values give the standard dot. */
+    static String markerStyle(Context context) {
+        return MarkerStyle.normalize(context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+                .getString(MARKER_STYLE, MarkerStyle.STANDARD));
+    }
+
+    static void setMarkerStyle(Context context, String id) {
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
+                .putString(MARKER_STYLE, MarkerStyle.normalize(id)).apply();
     }
 }

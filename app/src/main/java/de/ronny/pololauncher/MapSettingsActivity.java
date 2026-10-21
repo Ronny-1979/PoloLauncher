@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -81,6 +82,27 @@ public final class MapSettingsActivity extends Activity {
             tiltBar.setProgress(MapPreferences.DEFAULT_TILT / TILT_STEP);
             heightBar.setProgress(MapPreferences.DEFAULT_BUILDING_HEIGHT);
         });
+
+        section(root, "POSITIONSMARKE");
+        RadioGroup markers = new RadioGroup(this);
+        markers.setOrientation(RadioGroup.VERTICAL);
+        String current = MapPreferences.markerStyle(this);
+        for (String id : MarkerStyle.ids()) {
+            RadioButton button = new RadioButton(this);
+            button.setText(MarkerStyle.label(id));
+            button.setTextColor(GlassSkin.TEXT);
+            button.setTextSize(17);
+            button.setTag(id);
+            button.setId(View.generateViewId());
+            markers.addView(button, new RadioGroup.LayoutParams(-1, dp(48)));
+            if (id.equals(current)) markers.check(button.getId());
+        }
+        markers.setOnCheckedChangeListener((group, checkedId) -> {
+            View checked = group.findViewById(checkedId);
+            if (checked != null) MapPreferences.setMarkerStyle(this, String.valueOf(checked.getTag()));
+        });
+        root.addView(markers, new LinearLayout.LayoutParams(-1, -2));
+        root.addView(hint("Wie dein Auto auf der Karte markiert wird: der blaue Standard-Punkt, ein Halloween-Kürbis oder der Schlitten vom Weihnachtsmann (dreht sich mit der Fahrtrichtung). Wirkt, sobald du zur Hauptseite zurückkehrst."));
 
         section(root, "KARTENMODUS");
         activeColorMode = text("", 16, GlassSkin.GREEN, true);

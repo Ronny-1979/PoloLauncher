@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.125 / versionCode 206**. Basis v0.31.124.
+- Neu im Menü Karte: „Positionsmarke“ zum Umschalten zwischen dem blauen Standard-Punkt, einem Halloween-Kürbis und dem Weihnachtsschlitten (von oben gesehen, dreht sich mit dem GPS-Kurs, wenn Norden oben steht). Die Marken werden im Code gezeichnet (keine Bilddateien). Eine unbekannte oder fehlende Einstellung ergibt den Standard-Punkt. Die Wahl gilt, sobald man zur Hauptseite zurückkehrt.
+
 - Version: **0.31.124 / versionCode 205**. Basis v0.31.123.
 - Neu: Offline-Karten → „Von USB-Stick importieren“. Der Launcher sucht auf dem Stick den Ordner `PoloMaps` (Fallback: Ordnerauswahl), kopiert neuere Karten (`<land>-shortbread-1.0.mbtiles`) und Verkehrsdaten (`<land>-latest.osm.pbf`) und baut alles wie gewohnt auf. Alte Karten bleiben bis zum Ersatz aktiv.
 - Neu: `tools/windows-downloader/` – Windows-Programm (PoloMapsDownloader.exe) lädt alle Dateien von Geofabrik mit einem Klick auf den Stick (Fortsetzen, Überspringen, Datum wie am Server).

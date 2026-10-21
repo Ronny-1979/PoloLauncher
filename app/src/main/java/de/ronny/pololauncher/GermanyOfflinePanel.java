@@ -40,7 +40,7 @@ final class GermanyOfflinePanel {
     private final FrameLayout surface;
     private final MapView view;
     private final View nightShade;
-    private final View marker;
+    private final MarkerArtView marker;
     private final TextView gps;
     private final TextView notice;
     private final GermanyOfflineAnalyzer analyzer;
@@ -113,15 +113,11 @@ final class GermanyOfflinePanel {
         nightShade.setVisibility(View.GONE);
         surface.addView(nightShade, new FrameLayout.LayoutParams(-1, -1));
 
-        marker = new View(context);
-        GradientDrawable dot = new GradientDrawable();
-        dot.setShape(GradientDrawable.OVAL);
-        dot.setColor(Color.rgb(31, 139, 247));
-        dot.setStroke(dp(3), Color.WHITE);
-        marker.setBackground(dot);
+        marker = new MarkerArtView(context);
         marker.setElevation(dp(5));
         marker.setVisibility(View.GONE);
         surface.addView(marker, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        applyMarkerStyle();
 
         gps = new TextView(context);
         gps.setText("◎  GPS");
@@ -396,8 +392,30 @@ final class GermanyOfflinePanel {
     }
 
     /** Back from the map menu: apply a changed tilt right away and rebuild the style for a changed building height. */
+    /** Applies the chosen marker look (dot, pumpkin, sleigh) and, for the sleigh, its heading. */
+    void applyMarkerStyle() {
+        String id = MapPreferences.markerStyle(context);
+        marker.setStyle(id);
+        int[] size = MarkerStyle.sizeDp(id);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(size[0]), dp(size[1]), Gravity.CENTER);
+        marker.setLayoutParams(lp);
+        marker.setPivotX(dp(size[0]) / 2f);
+        marker.setPivotY(dp(size[1]) / 2f);
+        updateMarkerRotation();
+    }
+
+    private void updateMarkerRotation() {
+        float rotation = 0f;
+        if (MarkerStyle.rotates(MapPreferences.markerStyle(context)) && map != null && course.known()) {
+            double diff = course.bearing() - map.getCameraPosition().bearing;
+            rotation = (float) (((diff % 360d) + 360d) % 360d);
+        }
+        marker.setRotation(rotation);
+    }
+
     void applyViewSettings() {
         if (map == null || destroyed || failed) return;
+        applyMarkerStyle();
         if (styleApplied && !styleReloading && styleBuildingHeight >= 0
                 && styleBuildingHeight != MapPreferences.buildingHeight(context)) {
             DiagLog.add("Offline-Stil: Gebäudehöhe geändert (" + styleBuildingHeight + " → "
@@ -654,6 +672,7 @@ final class GermanyOfflinePanel {
         }
         MapFollowDiagnostics.moved("germany", location.getLatitude(), location.getLongitude());
         marker.setVisibility(View.VISIBLE);
+        updateMarkerRotation();
     }
 
     private void cancelZoomStep() {
