@@ -1,4 +1,4 @@
-# Testbericht v0.31.129 (wöchentliche Karten-Update-Prüfung mit Popup)
+# Testbericht v0.31.130 (wöchentliche Karten-Update-Prüfung mit Popup)
 
 Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
 
@@ -88,3 +88,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.129
 - OBD2-Verlauf: eigener kurzer Ereignisspeicher (ObdHistory, getestet), im Diagnoseprotokoll unter OBD2. Ursache des Verbindungsproblems nach Zündung aus/an ist damit NICHT behoben, nur nachvollziehbar gemacht. Kompiliert, im Auto nicht geprüft.
+
+## Nachtrag v0.31.130
+- GitHub-Build signierte mit einem eigenen Schlüssel (31:C8:0A:EC…) statt mit dem hinterlegten (D9:46:63:4A…). Jetzt wird die Schlüsseldatei per DEBUG_KEYSTORE_PATH ausdrücklich in signingConfigs.debug eingetragen. Wirkt nur im GitHub-Build; am PC unverändert. Erst der nächste GitHub-Lauf zeigt, ob es greift.

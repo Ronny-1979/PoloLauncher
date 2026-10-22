@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.130 / versionCode 211**. Basis v0.31.129. Keine Funktionsänderung der App.
+- GitHub-Build: Die Debug-APK wurde mit einem eigenen, zufälligen Schlüssel signiert, obwohl das Secret DEBUG_KEYSTORE_BASE64 (Schlüssel D9:46:63:4A…) korrekt geladen war; deshalb ließ sie sich nicht über die bestehende App installieren. `app/build.gradle` trägt die Schlüsseldatei jetzt über `DEBUG_KEYSTORE_PATH` in `signingConfigs.debug` ein (nur wenn die Variable gesetzt ist, also nur im GitHub-Build). Der Workflow gibt Fingerabdrücke von Schlüssel und APK als Hinweis aus.
+
 - Version: **0.31.129 / versionCode 210**. Basis v0.31.128.
 - Diagnose: Im Abschnitt „OBD2-ADAPTER / ELM327“ steht jetzt ein „OBD2-Verlauf“ der letzten 60 wichtigen Ereignisse mit Uhrzeit (Verbindungsversuche mit Dauer und Fehler, Hänger nach 20 s, Verbindung verloren, Neuverbindung nach Standby, erste brauchbare Daten). Der gemeinsame Log vergisst diese Ereignisse nach etwa einer Minute, weil er von CAN-Meldungen überflutet wird. Keine Änderung am Verbindungsverhalten.
 

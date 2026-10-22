@@ -37,6 +37,8 @@ jobs:
           if [ -n "$KS" ]; then
             mkdir -p ~/.android
             echo "$KS" | base64 -d > ~/.android/debug.keystore
+            cp ~/.android/debug.keystore "$RUNNER_TEMP/debug.keystore"
+            echo "DEBUG_KEYSTORE_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
             echo "Eigener Debug-Schlüssel aktiv"
           else
             echo "::warning::Secret DEBUG_KEYSTORE_BASE64 fehlt: Zufallsschlüssel, die APK kann die bestehende App NICHT aktualisieren."
