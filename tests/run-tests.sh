@@ -194,9 +194,9 @@ fi
 echo "SachsenFollowParityTest: raw analysis + filtered camera + v0.31.49 follow thresholds configured"
 germany_analyzer="app/src/main/java/de/ronny/pololauncher/GermanyOfflineAnalyzer.java"
 if ! grep -Fq 'SettlementZoomGate areaGate' "$germany_analyzer" || \
-   ! grep -Fq 'MapPreferences.directBoundaryZoom(context)' "$germany_analyzer" || \
+   grep -Fq 'directBoundaryZoom' "$germany_analyzer" || \
    ! grep -Fq 'areaGate.update(' "$germany_analyzer"; then
-  echo "SachsenFollowParityTest: FEHLER - bewährte Direkt/Stabil-Hysterese fehlt im Deutschland-Ortszoom" >&2
+  echo "SachsenFollowParityTest: FEHLER - bewährte Ortszoom-Hysterese fehlt oder der alte Direkt/Stabil-Schalter ist wieder da" >&2
   exit 1
 fi
 echo "SachsenFollowParityTest: Germany autozoom reuses v0.31.49 direct/stable hysteresis"
@@ -303,10 +303,10 @@ java -m jdk.compiler/com.sun.tools.javac.Main ${JAVAC_RELEASE:---release 17} -d 
   "$source_dir/SystemCanReceiver.java" \
   "$source_dir/RangeStore.java" "$source_dir/RangeTrackingSession.java" "$source_dir/RangeDisplayStore.java" \
   "$source_dir/Obd2PidDecoder.java" "$source_dir/Obd2ConsumptionAverager.java" \
-  "$source_dir/Obd2Client.java" "$source_dir/Obd2Runtime.java" "$source_dir/DabStartupGate.java" "$source_dir/StandbyWakeDetector.java" "$source_dir/CarPlayReturnGate.java" "$source_dir/ConsumptionDisplay.java" "$source_dir/SeatbeltAlert.java" "$source_dir/DabReturnGate.java" "$source_dir/MapUpdateSchedule.java" "$source_dir/UsbImportLayout.java" "$source_dir/MarkerStyle.java" "$source_dir/ObdHistory.java" \
+  "$source_dir/Obd2Client.java" "$source_dir/Obd2Runtime.java" "$source_dir/DabStartupGate.java" "$source_dir/StandbyWakeDetector.java" "$source_dir/CarPlayReturnGate.java" "$source_dir/ConsumptionDisplay.java" "$source_dir/SeatbeltAlert.java" "$source_dir/DabReturnGate.java" "$source_dir/MapUpdateSchedule.java" "$source_dir/UsbImportLayout.java" "$source_dir/MarkerStyle.java" "$source_dir/ObdHistory.java" "$source_dir/MapResumePolicy.java" \
   "$source_dir/WeatherForecast.java" "$source_dir/Locality.java" "$source_dir/SolarDaylight.java" "$source_dir/ImageSampling.java" tests/*Test.java tests/DiagLogReset.java
 for test_class in AverageDisplayFilterTest RangeDisplayFilterTest RangeEstimatorTest GpsFollowFilterTest DiagLogTest \
-  OfflineGlyphValidatorTest CanFrameTest CanBindingTest CanReconnectTest PositionResultGateTest CameraMotionTest CameraAimTest BearingSmootherTest RpmFrozenTest SeatbeltAlertTest RoadSnapSelectorTest MvtRoadDecoderTest OfflineStyleTest LocalTileServerTest SettlementZoomGateTest SpeedLimitValueTest SpeedLimitGateTest SpeedLimitDiagnosticsTest SpeedCameraDecisionTest SpeedCameraGateTest GermanyOfflineUpdatePolicyTest TrafficPbfScannerTest GermanyRoadMatcherListenerTest GermanyRoadSnapParityTest MapFollowDiagnosticsTest TrafficDataBoundsTest MediaInfoTest PagerGestureTest SystemCanReceiverTest RangeTrackingSessionTest Obd2PidDecoderTest Obd2ConsumptionAveragerTest CombinedRangeModelTest Obd2ClientTest DabStartupGateTest StandbyWakeDetectorTest CarPlayReturnGateTest DabReturnGateTest MapUpdateScheduleTest UsbImportLayoutTest MarkerStyleTest ObdHistoryTest ConsumptionDisplayTest WeatherForecastTest LocalityTest SolarDaylightTest ImageSamplingTest RangeEstimatorRecoveryTest Obd2ResilienceTest DeepInvariantTest SourceAuditTest
+  OfflineGlyphValidatorTest CanFrameTest CanBindingTest CanReconnectTest PositionResultGateTest CameraMotionTest CameraAimTest BearingSmootherTest RpmFrozenTest SeatbeltAlertTest RoadSnapSelectorTest MvtRoadDecoderTest OfflineStyleTest LocalTileServerTest SettlementZoomGateTest SpeedLimitValueTest SpeedLimitGateTest SpeedLimitDiagnosticsTest SpeedCameraDecisionTest SpeedCameraGateTest GermanyOfflineUpdatePolicyTest TrafficPbfScannerTest GermanyRoadMatcherListenerTest GermanyRoadSnapParityTest MapFollowDiagnosticsTest TrafficDataBoundsTest MediaInfoTest PagerGestureTest SystemCanReceiverTest RangeTrackingSessionTest Obd2PidDecoderTest Obd2ConsumptionAveragerTest CombinedRangeModelTest Obd2ClientTest DabStartupGateTest StandbyWakeDetectorTest CarPlayReturnGateTest DabReturnGateTest MapUpdateScheduleTest UsbImportLayoutTest MarkerStyleTest ObdHistoryTest MapResumePolicyTest ConsumptionDisplayTest WeatherForecastTest LocalityTest SolarDaylightTest ImageSamplingTest RangeEstimatorRecoveryTest Obd2ResilienceTest DeepInvariantTest SourceAuditTest
 do
   java -cp "$test_output" "de.ronny.pololauncher.$test_class"
 done

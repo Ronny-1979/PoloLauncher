@@ -28,8 +28,8 @@ final class MarkerStyle {
     /** Marker size in dp (width, height). */
     static int[] sizeDp(String id) {
         String n = normalize(id);
-        if (PUMPKIN.equals(n)) return new int[] {32, 29};
-        if (SLEIGH.equals(n)) return new int[] {24, 40};
+        if (PUMPKIN.equals(n)) return new int[] {26, 24};
+        if (SLEIGH.equals(n)) return new int[] {20, 34};
         return new int[] {20, 20};
     }
 

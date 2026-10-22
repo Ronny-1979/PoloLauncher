@@ -319,17 +319,17 @@ public final class SourceAuditTest {
         requires(source("PoloApplication"), "UiStallWatchdog.start(this)",
                 "UI stalls are recorded with the main thread's stack");
         forbids(source("GermanyOfflinePanel"), "queryRenderedFeatures", "No screen-dependent road query");
-        requires(mapSettings, "Direkt an Ortsgrenze umschalten",
-                "Direct settlement-boundary zoom is exposed in map settings");
+        forbids(mapSettings, "Direkt an Ortsgrenze umschalten",
+                "Direct settlement-boundary zoom is permanent: no switch in the map settings any more");
         forbids(mapSettings, "setAutoZoom", "Location-dependent zoom is permanent: no switch any more");
         forbids(source("MapPreferences"), "autoZoom(", "Location-dependent zoom is permanent");
         requires(source("VehicleRepository"), "RPM_FROZEN_MS", "A frozen rpm value after engine-off is shown as 0");
-        requires(source("MapPreferences"), "direct_boundary_zoom",
-                "Direct settlement-boundary zoom is persisted");
-        requires(source("SettlementZoomGate"), "STABLE_EXIT_DISTANCE_M = 120d",
-                "Stable exit needs meaningful travelled distance");
-        requires(source("SettlementZoomGate"), "STABLE_EXIT_CONFIRMATIONS = 3",
-                "Stable exit needs repeated clear outside observations");
+        forbids(source("MapPreferences"), "direct_boundary_zoom",
+                "Direct settlement-boundary zoom is permanent and no longer a stored setting");
+        requires(source("SettlementZoomGate"), "EXIT_DISTANCE_M = 60d",
+                "Exit from the settlement zoom needs meaningful travelled distance");
+        requires(source("SettlementZoomGate"), "EXIT_CONFIRMATIONS = 2",
+                "Exit from the settlement zoom needs repeated clear outside observations");
         requires(main, "String.format(Locale.GERMANY, \"%.0f L\", shownTank)",
                 "Last known tank value remains readable without an ALT suffix");
         forbids(main, "%.0f L ALT", "Tank age is conveyed by orange colour, not extra text");

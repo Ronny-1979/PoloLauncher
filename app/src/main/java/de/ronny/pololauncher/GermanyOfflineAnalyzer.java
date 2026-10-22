@@ -140,8 +140,7 @@ final class GermanyOfflineAnalyzer implements AutoCloseable {
         long now = SystemClock.elapsedRealtime();
         double moved = lastAreaSample == null ? 0d : source.distanceTo(lastAreaSample);
         lastAreaSample = new Location(source);
-        SettlementZoomGate.Signal stable = areaGate.update(areaSignal(observation), false, now, moved,
-                MapPreferences.directBoundaryZoom(context));
+        SettlementZoomGate.Signal stable = areaGate.update(areaSignal(observation), false, now, moved);
         MapArea next = areaFromSignal(stable);
         if (next != MapArea.UNKNOWN && next != area) {
             area = next;
@@ -149,8 +148,7 @@ final class GermanyOfflineAnalyzer implements AutoCloseable {
             if (c != null) c.accept(next);
             DiagLog.add("Deutschland Ortszoom aus Tempodaten: "
                     + (next == MapArea.SETTLEMENT ? "innerorts" : "außerorts")
-                    + (speed == null || speed.roadType.isEmpty() ? "" : " · " + speed.roadType)
-                    + (MapPreferences.directBoundaryZoom(context) ? " · direkt" : " · stabil"));
+                    + (speed == null || speed.roadType.isEmpty() ? "" : " · " + speed.roadType));
         }
     }
 

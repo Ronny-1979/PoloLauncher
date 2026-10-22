@@ -4,18 +4,16 @@ package de.ronny.pololauncher;
  * Adaptive inner/outer-town state gate.
  *
  * Entry is deliberately fast: a current or look-ahead settlement hit immediately switches
- * to SETTLEMENT. Exit is deliberately slow: while inside, several consecutive OUTSIDE
- * observations, a minimum travelled distance and a minimum hold time are required.
+ * to SETTLEMENT. Exit needs two consecutive OUTSIDE observations, a minimum travelled
+ * distance and a minimum hold time, so a single map gap never zooms out.
  */
 final class SettlementZoomGate {
     enum Signal { UNKNOWN, SETTLEMENT, OUTSIDE }
 
-    private static final long STABLE_MIN_HOLD_MS = 10_000L;
-    private static final long DIRECT_MIN_HOLD_MS = 6_000L;
-    private static final int STABLE_EXIT_CONFIRMATIONS = 3;
-    private static final int DIRECT_EXIT_CONFIRMATIONS = 2;
-    private static final double STABLE_EXIT_DISTANCE_M = 120d;
-    private static final double DIRECT_EXIT_DISTANCE_M = 60d;
+    /** Direct switching at the town boundary (the only mode): short hold, two clear exits, 60 m. */
+    private static final long EXIT_MIN_HOLD_MS = 6_000L;
+    private static final int EXIT_CONFIRMATIONS = 2;
+    private static final double EXIT_DISTANCE_M = 60d;
 
     private Signal stable = Signal.UNKNOWN;
     private long settlementSinceMs;
@@ -23,7 +21,7 @@ final class SettlementZoomGate {
     private double outsideDistanceM;
 
     Signal update(Signal currentObservation, boolean lookAheadSettlement,
-                  long nowMs, double movedSincePreviousSampleM, boolean directMode) {
+                  long nowMs, double movedSincePreviousSampleM) {
         Signal current = currentObservation == null ? Signal.UNKNOWN : currentObservation;
 
         // Enter fast, including the predicted point in driving direction.
@@ -46,8 +44,7 @@ final class SettlementZoomGate {
                 return stable;
             }
 
-            long minimumHold = directMode ? DIRECT_MIN_HOLD_MS : STABLE_MIN_HOLD_MS;
-            if (nowMs - settlementSinceMs < minimumHold) {
+            if (nowMs - settlementSinceMs < EXIT_MIN_HOLD_MS) {
                 outsideConfirmations = 0;
                 outsideDistanceM = 0d;
                 return stable;
@@ -61,13 +58,8 @@ final class SettlementZoomGate {
                 outsideDistanceM += Math.max(0d, movedSincePreviousSampleM);
             }
 
-            int confirmationsNeeded = directMode
-                    ? DIRECT_EXIT_CONFIRMATIONS : STABLE_EXIT_CONFIRMATIONS;
-            double distanceNeeded = directMode
-                    ? DIRECT_EXIT_DISTANCE_M : STABLE_EXIT_DISTANCE_M;
-
-            if (outsideConfirmations >= confirmationsNeeded
-                    && outsideDistanceM >= distanceNeeded) {
+            if (outsideConfirmations >= EXIT_CONFIRMATIONS
+                    && outsideDistanceM >= EXIT_DISTANCE_M) {
                 stable = Signal.OUTSIDE;
                 outsideConfirmations = 0;
                 outsideDistanceM = 0d;

@@ -1,4 +1,4 @@
-# Testbericht v0.31.131 (wöchentliche Karten-Update-Prüfung mit Popup)
+# Testbericht v0.31.132 (wöchentliche Karten-Update-Prüfung mit Popup)
 
 Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
 
@@ -92,5 +92,9 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 ## Nachtrag v0.31.130
 - GitHub-Build signierte mit einem eigenen Schlüssel (31:C8:0A:EC…) statt mit dem hinterlegten (D9:46:63:4A…). Jetzt wird die Schlüsseldatei per DEBUG_KEYSTORE_PATH ausdrücklich in signingConfigs.debug eingetragen. Wirkt nur im GitHub-Build; am PC unverändert. Erst der nächste GitHub-Lauf zeigt, ob es greift.
 
-## Nachtrag v0.31.131
+## Nachtrag v0.31.132
 - Positionsmarken verkleinert (Kürbis 48x44 -> 32x29 dp, Schlitten 34x56 -> 24x40 dp), nach Foto vom Radio. Standard-Punkt unverändert 20 dp.
+
+## Nachtrag v0.31.132
+- Neu: MapResumePolicyTest (Fehlerklassifizierung transient/fatal, Wartezeiten, Range-Fortsetzpunkt). Direkt-Ortsgrenze-Schalter und Reste entfernt, SettlementZoomGateTest/SourceAuditTest angepasst.
+- Nicht am Radio getestet: Range-Fortsetzung gegen den echten Server, Alarm-Wiederaufnahme im Standby (Android kann Hintergrundstarts blockieren).

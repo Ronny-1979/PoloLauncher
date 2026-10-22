@@ -27,7 +27,6 @@ public final class MapSettingsActivity extends Activity {
     private static final int TILT_STEP = 5;
     private SeekBar settlementZoomBar;
     private SeekBar outsideZoomBar;
-    private Switch directBoundaryZoom;
     private Switch speedCameraAlerts;
     private TextView speedCameraHint;
     private RadioGroup colorModes;
@@ -134,14 +133,7 @@ public final class MapSettingsActivity extends Activity {
         section(root, "ZOOM");
         root.addView(hint("Der Zoom richtet sich automatisch nach dem Ort: Innerorts und Außerorts werden an der GPS-Position erkannt (mit Vorausschau, schnellem Ortseingang und geglättetem Herauszoomen). Bis das Gebiet erkannt ist, gilt Zoom 16."));
 
-        directBoundaryZoom = toggle("Direkt an Ortsgrenze umschalten",
-                MapPreferences.directBoundaryZoom(this));
-        directBoundaryZoom.setOnCheckedChangeListener((button, enabled) ->
-                MapPreferences.setDirectBoundaryZoom(this, enabled));
-        root.addView(directBoundaryZoom, new LinearLayout.LayoutParams(-1, dp(56)));
-        root.addView(hint("Beide Modi schauen in Fahrtrichtung voraus und schalten beim Einfahren schnell auf Innerorts. "
-                + "Stabil hält Innerorts bei OSM-Lücken besonders konsequent und zoomt erst nach mehreren klaren Außerorts-Treffern wieder heraus. "
-                + "Direkt reagiert beim tatsächlichen Verlassen etwas früher."));
+        root.addView(hint("Das Umschalten an der Ortsgrenze ist immer aktiv: Beim Einfahren schaltet der Zoom schnell auf Innerorts, beim tatsächlichen Verlassen zügig wieder auf Außerorts."));
 
         settlementZoomText = text("Innerorts: " + MapPreferences.settlementZoom(this), 18, GlassSkin.ACCENT, true);
         root.addView(settlementZoomText, new LinearLayout.LayoutParams(-1, dp(34)));
@@ -197,9 +189,6 @@ public final class MapSettingsActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         refreshColorMode();
-        if (directBoundaryZoom != null) {
-            directBoundaryZoom.setChecked(MapPreferences.directBoundaryZoom(this));
-        }
         if (speedCameraAlerts != null) {
             speedCameraAlerts.setChecked(MapPreferences.speedCameraAlerts(this));
             if (speedCameraHint != null) speedCameraHint.setText(speedCameraHintText());

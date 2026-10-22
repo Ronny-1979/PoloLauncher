@@ -1,5 +1,12 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.132 / versionCode 213**. Basis v0.31.131.
+- Karten-Update läuft von selbst weiter: Bricht die Verbindung ab (z. B. Standby, Funkloch, „SocketException“), wird das nicht mehr als Fehler beendet. Der Dienst wartet (15 s, 30 s, 1, 2, 5, max. 10 min) und macht an derselben Stelle weiter. Zusätzlich weckt ein Alarm alle ~10 Minuten die App, falls Android den Dienst beendet hat; beim Einschalten des Radios und beim Start des Launchers wird ebenfalls fortgesetzt, bis alles fertig ist. Der Wunsch „Update läuft“ bleibt bis zum Ende gespeichert.
+- Downloads setzen exakt am Abbruchpunkt fort (HTTP-Range mit If-Range): halb geladene Karten und OSM-Rohdaten werden nicht mehr von vorn geladen. Hat sich die Datei auf dem Server geändert, beginnt nur diese eine Datei neu.
+- Beim Update-Lauf gilt „Server nicht erreichbar“ nicht mehr als „bereits aktuell“ (früher konnte eine Karte dadurch unbemerkt übersprungen werden); es wird stattdessen später erneut geprüft.
+- „Direkt an Ortsgrenze umschalten“ ist dauerhaft aktiv: Schalter im Kartenmenü, Einstellung `direct_boundary_zoom` und alle Reste im Code entfernt (SettlementZoomGate verwendet immer die schnelle Ausfahrt: 60 m und 2 Bestätigungen, mindestens 6 s).
+- Positionsmarken noch kleiner: Kürbis 26 × 24 dp, Schlitten 20 × 34 dp.
+
 - Version: **0.31.131 / versionCode 212**. Basis v0.31.130.
 - Positionsmarken verkleinert, weil sie auf dem Radio zu groß wirkten: Halloween-Kürbis jetzt 32 × 29 dp (vorher 48 × 44), Weihnachtsschlitten 24 × 40 dp (vorher 34 × 56). Der blaue Standard-Punkt bleibt bei 20 dp.
 

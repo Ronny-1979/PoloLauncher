@@ -1,5 +1,7 @@
 package de.ronny.pololauncher;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -306,6 +308,35 @@ final class GermanyOfflineStore {
                 .putBoolean(RUN_PENDING, true)
                 .putBoolean(RUN_UPDATE, updateExisting)
                 .commit();
+        scheduleResumeTick(c);
+    }
+
+    static final String ACTION_RESUME_TICK = "de.ronny.pololauncher.GERMANY_RESUME_TICK";
+    private static final long RESUME_TICK_MS = 10L * 60L * 1000L;
+
+    private static PendingIntent resumeTickIntent(Context c) {
+        Intent intent = new Intent(c, GermanyOfflineResumeReceiver.class).setAction(ACTION_RESUME_TICK);
+        return PendingIntent.getBroadcast(c.getApplicationContext(), 4214, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /**
+     * Safety net while a build/update is pending: wake the app every ~10 min (even in Doze/standby) so a
+     * killed service is restarted without anybody touching the radio. Best effort; cancelled on finish/cancel.
+     */
+    static void scheduleResumeTick(Context c) {
+        try {
+            AlarmManager alarms = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (alarms != null) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + RESUME_TICK_MS, resumeTickIntent(c));
+        } catch (Throwable ignored) {}
+    }
+
+    static void cancelResumeTick(Context c) {
+        try {
+            AlarmManager alarms = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (alarms != null) alarms.cancel(resumeTickIntent(c));
+        } catch (Throwable ignored) {}
     }
 
     static boolean runPending(Context c) {
@@ -429,6 +460,7 @@ final class GermanyOfflineStore {
 
     static void markReady(Context c) {
         invalidateCaches();
+        cancelResumeTick(c);
         prefs(c).edit()
                 .putBoolean(READY, true)
                 .remove(RUN_PENDING).remove(RUN_UPDATE).remove(IMPORT_SOURCE)
@@ -440,6 +472,7 @@ final class GermanyOfflineStore {
     }
 
     static void markStopped(Context c, String phase, String detail) {
+        cancelResumeTick(c);
         prefs(c).edit()
                 .remove(RUN_PENDING).remove(RUN_UPDATE).remove(IMPORT_SOURCE)
                 .putString(PHASE, phase)

@@ -11,6 +11,12 @@ public final class GermanyOfflineResumeReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             GermanyOfflineStore.autoResumePending(context);
+        } else if (GermanyOfflineStore.ACTION_RESUME_TICK.equals(action)) {
+            // Periodic safety net while a build/update is pending: restart a dead service, keep ticking.
+            if (GermanyOfflineStore.runPending(context)) {
+                GermanyOfflineStore.autoResumePending(context);
+                GermanyOfflineStore.scheduleResumeTick(context);
+            }
         }
     }
 }

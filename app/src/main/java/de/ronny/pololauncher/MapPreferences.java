@@ -16,7 +16,6 @@ final class MapPreferences {
     static final int DEFAULT_OUTSIDE_ZOOM = 16;
     private static final String NAME = "cockpit_map";
     private static final String KEY = "zoom";
-    private static final String DIRECT_BOUNDARY_ZOOM = "direct_boundary_zoom";
     private static final String SETTLEMENT_ZOOM = "settlement_zoom";
     private static final String OUTSIDE_ZOOM = "outside_zoom";
     private static final String SPEED_CAMERA_ALERTS = "speed_camera_alerts";
@@ -85,16 +84,6 @@ final class MapPreferences {
     static void setSpeedCameraAlerts(Context context, boolean enabled) {
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
                 .putBoolean(SPEED_CAMERA_ALERTS, enabled).apply();
-    }
-
-    static boolean directBoundaryZoom(Context context) {
-        return context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
-                .getBoolean(DIRECT_BOUNDARY_ZOOM, false);
-    }
-
-    static void setDirectBoundaryZoom(Context context, boolean enabled) {
-        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
-                .putBoolean(DIRECT_BOUNDARY_ZOOM, enabled).apply();
     }
 
     /** "direct" (mbtiles://) or "http" (local tile server): the way that last worked on this radio. */

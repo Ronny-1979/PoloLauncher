@@ -37,6 +37,10 @@ public final class GermanyOfflineService extends Service {
         return t;
     });
     private volatile boolean cancelled;
+    private volatile int consecutiveFailures;
+    private int totalRetries;
+    private volatile String lastPhase = GermanyOfflineStore.PHASE_MAP;
+    private volatile int lastStep, lastSteps;
     private volatile boolean userCancelled;
     private volatile boolean running;
     private volatile boolean updateExisting;
@@ -84,6 +88,8 @@ public final class GermanyOfflineService extends Service {
 
         cancelled = false;
         userCancelled = false;
+        totalRetries = 0;
+        consecutiveFailures = 0;
         serviceDestroying = false;
         updateExisting = intent != null
                 ? intent.getBooleanExtra(GermanyOfflineStore.EXTRA_UPDATE_EXISTING,
@@ -110,6 +116,22 @@ public final class GermanyOfflineService extends Service {
     }
 
     private void runInstall() {
+        try {
+            while (runInstallOnce()) { /* transient failure: waited, now continue where we stopped */ }
+        } finally {
+            running = false;
+            processRunning = false;
+            stopHeartbeat();
+            releaseWakeLock();
+            if (!serviceDestroying) {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+            }
+        }
+    }
+
+    /** Returns true when a network-type failure was waited out and the run should simply continue. */
+    private boolean runInstallOnce() {
         try {
             File root = GermanyOfflineStore.root(this);
             File maps = GermanyOfflineStore.mapsDir(this);
@@ -188,6 +210,22 @@ public final class GermanyOfflineService extends Service {
             } else if (userCancelled) {
                 GermanyOfflineStore.markStopped(this, GermanyOfflineStore.PHASE_CANCELLED,
                         "Deutschland-Aufbau abgebrochen – vorhandene fertige Daten bleiben erhalten");
+            } else if (MapResumePolicy.isTransient(error)) {
+                // Connection lost / server hiccup: NOT an error for the user. RUN_PENDING stays set, the
+                // part files stay on disk, and we continue automatically (also after a process restart).
+                consecutiveFailures++;
+                if (++totalRetries > 100) {
+                    String message = "Offline Deutschland: zu viele Verbindungsfehler – " + error.getClass().getSimpleName();
+                    DiagLog.add(message);
+                    GermanyOfflineStore.markStopped(this, GermanyOfflineStore.PHASE_ERROR, message);
+                    updateNotification("Offline Deutschland", message, 0, 0, false);
+                    return false;
+                }
+                long wait = MapResumePolicy.backoffMs(consecutiveFailures);
+                DiagLog.add("Deutschland Offline: Verbindung unterbrochen ("
+                        + error.getClass().getSimpleName() + (error.getMessage() == null ? "" : " " + error.getMessage())
+                        + ") – automatischer neuer Versuch in " + (wait / 1000L) + " s, Fortsetzung an gleicher Stelle");
+                return waitBeforeRetry(wait);
             } else {
                 String message = "Offline Deutschland fehlgeschlagen: "
                         + error.getClass().getSimpleName()
@@ -196,16 +234,21 @@ public final class GermanyOfflineService extends Service {
                 GermanyOfflineStore.markStopped(this, GermanyOfflineStore.PHASE_ERROR, message);
                 updateNotification("Offline Deutschland", message, 0, 0, false);
             }
-        } finally {
-            running = false;
-            processRunning = false;
-            stopHeartbeat();
-            releaseWakeLock();
-            if (!serviceDestroying) {
-                stopForeground(STOP_FOREGROUND_REMOVE);
-                stopSelf();
-            }
         }
+        return false;
+    }
+
+    /** Waits (cancellable, heartbeat alive) and reports why. Returns false if the user cancelled or the service is going down. */
+    private boolean waitBeforeRetry(long waitMs) {
+        long end = System.currentTimeMillis() + waitMs;
+        String text = "Verbindung unterbrochen – es geht automatisch weiter (Versuch " + (consecutiveFailures + 1) + ")";
+        GermanyOfflineStore.setProgress(this, lastPhase, lastStep, lastSteps, 0L, 0L, text);
+        updateNotification("Offline Deutschland", text, 0, 0, true);
+        while (System.currentTimeMillis() < end) {
+            if (cancelled || Thread.currentThread().isInterrupted()) return false;
+            try { Thread.sleep(1000L); } catch (InterruptedException e) { return false; }
+        }
+        return !cancelled;
     }
 
     private void installMap(String region, String name, int step, int totalSteps) throws Exception {
@@ -431,6 +474,8 @@ public final class GermanyOfflineService extends Service {
         }
         boolean completeSource = reusableTrafficSource(pbf, remote);
         boolean activated = false;
+        // A half-downloaded PBF is kept (network loss) so the next attempt resumes at that byte.
+        boolean keepPartial = remote.modified > 0L && remote.size > 0L;
         try {
             if (completeSource) {
                 DiagLog.add("Deutschland Verkehr " + name
@@ -440,7 +485,9 @@ public final class GermanyOfflineService extends Service {
                 progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, 0L,
                         "Verkehr " + name + ": Download vollständig – Analyse wird fortgesetzt …");
             } else {
-                if (pbf.exists() && !pbf.delete())
+                // A shorter partial file is continued by download() (Range); anything else starts fresh.
+                if (pbf.exists() && MapResumePolicy.resumeOffset(pbf.length(), remote.size, remote.modified) == 0L
+                        && !pbf.delete())
                     throw new IllegalStateException("Unvollständige OSM-Rohdaten nicht löschbar: " + name);
                 progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, remote.size,
                         "Verkehr " + name + ": lade OSM-Rohdaten …");
@@ -491,7 +538,7 @@ public final class GermanyOfflineService extends Service {
                 DiagLog.add("Deutschland Verkehr " + name
                         + ": OSM-Rohdaten für Fortsetzen behalten ("
                         + GermanyOfflineStore.humanBytes(pbf.length()) + ")");
-            } else if (pbf.exists()) {
+            } else if (pbf.exists() && !(pbf.length() > 0L && keepPartial)) {
                 pbf.delete();
             }
             if (tempDb.exists()) tempDb.delete();
@@ -519,6 +566,8 @@ public final class GermanyOfflineService extends Service {
     private void progress(String phase, int step, int steps, long done, long total, String detail) {
         checkCancelled();
         GermanyOfflineStore.setProgress(this, phase, step, steps, done, total, detail);
+        lastPhase = phase; lastStep = step; lastSteps = steps;
+        if (done > 0L) consecutiveFailures = 0;
         int percent = total > 0L ? (int) Math.min(100L, done * 100L / total) : 0;
         updateNotification("Offline Deutschland " + step + "/" + steps,
                 detail, 100, percent, total <= 0L);
@@ -530,7 +579,11 @@ public final class GermanyOfflineService extends Service {
         File parent = target.getParentFile();
         if (parent == null || (!parent.exists() && !parent.mkdirs()))
             throw new IllegalStateException("Download-Ordner fehlt");
-        if (target.exists() && !target.delete())
+        // Continue an interrupted .part exactly where it stopped (Range + If-Range). If the server file
+        // changed meanwhile, If-Range makes the server answer 200 with the full new file instead.
+        long offset = MapResumePolicy.resumeOffset(target.isFile() ? target.length() : 0L,
+                head == null ? 0L : head.size, head == null ? 0L : head.modified);
+        if (offset == 0L && target.exists() && !target.delete())
             throw new IllegalStateException("Temporäre Datei nicht löschbar");
 
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
@@ -539,17 +592,30 @@ public final class GermanyOfflineService extends Service {
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "PoloLauncher/" + BuildConfig.VERSION_NAME
                 + " (Germany offline map)");
+        if (offset > 0L) {
+            connection.setRequestProperty("Range", "bytes=" + offset + "-");
+            connection.setRequestProperty("If-Range", httpDate(head.modified));
+        }
         try {
             int code = connection.getResponseCode();
+            if (code == 416) {
+                target.delete();
+                throw new java.io.IOException("Teil-Download verworfen (HTTP 416) – neuer Versuch");
+            }
             if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
+            boolean resumed = offset > 0L && code == 206;
+            long base = resumed ? offset : 0L;
             long total = connection.getContentLengthLong();
-            if (total <= 0L) total = head.size;
-            if (total > 0L) ensureSpace(target, total);
+            if (total > 0L) total += base;
+            else total = head.size;
+            if (total > 0L) ensureSpace(target, total - base);
+            if (resumed) DiagLog.add("Download fortgesetzt ab " + GermanyOfflineStore.humanBytes(offset)
+                    + " – bereits Geladenes wird nicht erneut geholt");
             long modified = connection.getLastModified();
             byte[] buffer = new byte[256 * 1024];
-            long done = 0L, lastUi = 0L;
+            long done = base, lastUi = base;
             try (BufferedInputStream input = new BufferedInputStream(connection.getInputStream(), buffer.length);
-                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(target), buffer.length)) {
+                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(target, resumed), buffer.length)) {
                 int read;
                 while ((read = input.read(buffer)) >= 0) {
                     checkCancelled();
@@ -570,6 +636,13 @@ public final class GermanyOfflineService extends Service {
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static String httpDate(long millis) {
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(
+                "EEE, dd MMM yyyy HH:mm:ss 'GMT'", java.util.Locale.US);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("GMT"));
+        return f.format(new java.util.Date(millis));
     }
 
     private static void ensureSpace(File target, long incoming) {
@@ -623,7 +696,8 @@ public final class GermanyOfflineService extends Service {
         if (backup.exists()) backup.delete();
     }
 
-    private Remote probe(String url) {
+    /** Returns Remote.none() only when the server answered "no such file" (4xx); network problems throw. */
+    private Remote probe(String url) throws java.io.IOException {
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(url).openConnection();
@@ -633,10 +707,9 @@ public final class GermanyOfflineService extends Service {
             c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent", "PoloLauncher/" + BuildConfig.VERSION_NAME);
             int code = c.getResponseCode();
+            if (code >= 500 || code == 408 || code == 429) throw new IllegalStateException("HTTP " + code);
             if (code < 200 || code >= 300) return Remote.none();
             return new Remote(true, c.getContentLengthLong(), c.getLastModified());
-        } catch (Throwable ignored) {
-            return Remote.none();
         } finally {
             if (c != null) c.disconnect();
         }

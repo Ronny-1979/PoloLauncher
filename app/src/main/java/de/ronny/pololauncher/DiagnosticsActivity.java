@@ -133,7 +133,6 @@ public final class DiagnosticsActivity extends Activity {
         b.append("Aktueller Standard-Launcher: ").append(defaultHomePackage()).append("\n\n");
         b.append(GermanyOfflineStore.diagnosticSummary(this)).append("\n");
         b.append("Ortsabhängiger Zoom: AN (fest)")
-                .append("  Ausfahrt: ").append(MapPreferences.directBoundaryZoom(this) ? "DIREKTER" : "STABIL")
                 .append("  Grundzoom: ").append(MapPreferences.zoom(this))
                 .append("  Innerorts: ").append(MapPreferences.settlementZoom(this))
                 .append("  Außerorts: ").append(MapPreferences.outsideZoom(this)).append("\n");
