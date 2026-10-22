@@ -106,6 +106,8 @@ final class Obd2Client {
     private String lastLogKey = "";
     private long lastLogAt;
     private int suppressedLogs;
+    private final ObdHistory history = new ObdHistory(60);
+    private int connectAttempts;
     private volatile boolean connected;
     private volatile String status = "Angehalten";
     private volatile boolean reconnectRequested;
@@ -231,6 +233,7 @@ final class Obd2Client {
                 DiagLog.add("OBD2: Thread beendet durch " + error.getClass().getSimpleName() + ": " + error.getMessage()));
         thread.start();
         DiagLog.add("OBD2: Hintergrund-Thread gestartet");
+        hist("Hintergrund-Thread gestartet");
     }
 
     synchronized void stop() {
@@ -267,7 +270,10 @@ final class Obd2Client {
         lastWakeReconnectAtMs = now;
         reconnectRequested = true;
         DiagLog.add("OBD2: Neuverbindung nach Standby angefordert");
+        hist("Neuverbindung nach Standby angefordert");
     }
+
+    private void hist(String text) { history.add(System.currentTimeMillis(), text); }
 
     boolean isConnected() { return connected; }
     String status() { return status; }
@@ -293,7 +299,8 @@ final class Obd2Client {
                 + String.format(java.util.Locale.GERMANY,
                         "OBD Schubabschaltung geschätzt: %s (%d von %d Runden)\n",
                         dfcoEnabled(context) ? "AN" : "AUS", roundsFuelCut, roundsTotal)
-                + "Reichweitenquelle: " + (running ? "laufendes Fahrprofil" : "gespeichertes Fahrprofil") + "\n";
+                + "Reichweitenquelle: " + (running ? "laufendes Fahrprofil" : "gespeichertes Fahrprofil") + "\n"
+                + "OBD2-Verlauf (wichtige Ereignisse, aelteste zuerst):\n" + history.dump();
     }
 
     /**
@@ -338,6 +345,7 @@ final class Obd2Client {
                 sleep(POLL_INTERVAL_MS);
             } catch (IOException lost) {
                 if (!running || thread != Thread.currentThread()) return;
+                hist("Verbindung verloren: " + lost.getClass().getSimpleName() + " " + lost.getMessage());
                 logRepeated("lost:" + lost.getClass().getSimpleName(), "OBD2: Verbindung verloren ("
                         + lost.getClass().getSimpleName() + ": " + lost.getMessage() + "), verbinde neu");
                 closeQuietly();
@@ -347,6 +355,7 @@ final class Obd2Client {
             } catch (Throwable unexpected) {
                 // Includes Errors: a silently dead poll thread is exactly the failure v0.7.0 found.
                 if (!running || thread != Thread.currentThread()) return;
+                hist("Unerwarteter Fehler: " + unexpected.getClass().getSimpleName() + " " + unexpected.getMessage());
                 logRepeated("unexpected:" + unexpected.getClass().getSimpleName(),
                         "OBD2: unerwarteter Fehler im Poll-Loop (" + unexpected.getClass().getSimpleName()
                         + ": " + unexpected.getMessage() + "), verbinde neu");
@@ -415,11 +424,16 @@ final class Obd2Client {
             try { adapter.cancelDiscovery(); } catch (Throwable ignored) {}
             BluetoothSocket s = null;
             lastAttemptUsedRadio = true;
+            final long attemptStart = SystemClock.elapsedRealtime();
+            connectAttempts++;
+            hist("Verbindungsversuch " + connectAttempts + " (Standard-Socket)");
             try {
                 s = device.createRfcommSocketToServiceRecord(SPP_UUID);
                 socket = s; // Allow stop() to cancel a blocking connect.
                 guardedConnect(s);
             } catch (IOException direct) {
+                hist("Standard-Socket gescheitert nach " + (SystemClock.elapsedRealtime() - attemptStart) / 1000L
+                        + " s: " + direct.getClass().getSimpleName() + " - Wechsel auf Kanal-1-Socket");
                 // Some ELM327 clones fail the standard SDP-based socket but accept
                 // the well-known reflective channel-1 fallback used by most OBD apps.
                 closeSilently(s);
@@ -441,6 +455,9 @@ final class Obd2Client {
             firstPollAfterConnect = true;
             status = "Verbunden";
             DiagLog.add("OBD2: verbunden mit " + address);
+            hist("verbunden nach " + (SystemClock.elapsedRealtime() - attemptStart) / 1000L + " s (Versuch "
+                    + connectAttempts + ")");
+            connectAttempts = 0;
             probeSupportedPids();
             return true;
         } catch (SecurityException noPermission) {
@@ -449,6 +466,7 @@ final class Obd2Client {
         } catch (Exception failed) {
             if (!running || thread != Thread.currentThread()) return false;
             status = "Verbindung fehlgeschlagen: " + failed.getClass().getSimpleName();
+            hist("Verbindungsversuch gescheitert: " + failed.getClass().getSimpleName() + " " + failed.getMessage());
             logRepeated("connect:" + failed.getClass().getSimpleName(),
                     "OBD2: Verbindungsversuch fehlgeschlagen: " + failed.getClass().getSimpleName()
                     + " " + failed.getMessage());
@@ -469,6 +487,7 @@ final class Obd2Client {
             try { Thread.sleep(CONNECT_TIMEOUT_MS); } catch (InterruptedException e) { return; }
             if (finished.get()) return;
             DiagLog.add("OBD2: Verbindungsaufbau hängt seit " + CONNECT_TIMEOUT_MS / 1000L + " s, wird abgebrochen");
+            hist("Verbindungsaufbau hängt seit " + CONNECT_TIMEOUT_MS / 1000L + " s, abgebrochen");
             closeSilently(s);
         }, "obd2-connect-watchdog");
         watchdog.setDaemon(true);
@@ -588,6 +607,7 @@ final class Obd2Client {
         latestPollUsable = Double.isFinite(lph) && Double.isFinite(speedKmh);
         if (!latestPollUsable) lastSampleAtMs = 0;
         if (latestPollUsable) {
+            if (lastUsableElapsed < connectedAtElapsed) hist("erste brauchbare Verbrauchsdaten nach dem Verbinden");
             lastUsableAtMs = lastReplyAtMs;
             lastUsableElapsed = sampleAt;
             noDataRestartMs = NO_DATA_RESTART_MS;

@@ -1,4 +1,4 @@
-# Testbericht v0.31.128 (wöchentliche Karten-Update-Prüfung mit Popup)
+# Testbericht v0.31.129 (wöchentliche Karten-Update-Prüfung mit Popup)
 
 Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
 
@@ -85,3 +85,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.128
 - GPS-Taste: Text "◎  GPS" bleibt, bekommt statt des Rings einen ovalen Rahmen. Nur gegen die Android-API kompiliert, auf dem Radio nicht gesehen.
+
+## Nachtrag v0.31.129
+- OBD2-Verlauf: eigener kurzer Ereignisspeicher (ObdHistory, getestet), im Diagnoseprotokoll unter OBD2. Ursache des Verbindungsproblems nach Zündung aus/an ist damit NICHT behoben, nur nachvollziehbar gemacht. Kompiliert, im Auto nicht geprüft.
