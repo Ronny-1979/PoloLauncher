@@ -41,7 +41,7 @@ final class GermanyOfflinePanel {
     private final MapView view;
     private final View nightShade;
     private final MarkerArtView marker;
-    private final View gps;
+    private final TextView gps;
     private final TextView notice;
     private final GermanyOfflineAnalyzer analyzer;
     private final Runnable timeout;
@@ -119,12 +119,34 @@ final class GermanyOfflinePanel {
         surface.addView(marker, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
         applyMarkerStyle();
 
-        gps = new GpsRingView(context, context.getResources().getDisplayMetrics().density);
+        gps = new TextView(context);
+        gps.setText("◎  GPS");
+        gps.setTextSize(13);
+        gps.setTextColor(GlassSkin.TEXT);
+        gps.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        gps.setGravity(Gravity.CENTER);
         gps.setContentDescription("Auf GPS-Position zentrieren");
-        // Gleiche Größe und Lage wie der Info-Knopf links unten, nur spiegelbildlich rechts.
-        FrameLayout.LayoutParams gpsLp = new FrameLayout.LayoutParams(dp(40), dp(40),
+        // Ovaler Rahmen im Stil des Info-Knopfs: nur Linie, keine Füllfläche; ein dunkler Saum
+        // unter der hellen Linie hält sie auf heller Karte lesbar.
+        GradientDrawable halo = new GradientDrawable();
+        halo.setShape(GradientDrawable.RECTANGLE);
+        halo.setCornerRadius(dp(40));
+        halo.setColor(Color.TRANSPARENT);
+        halo.setStroke(Math.round(dp(1) * 3.4f), Color.argb(110, 0, 0, 0));
+        GradientDrawable ring = new GradientDrawable();
+        ring.setShape(GradientDrawable.RECTANGLE);
+        ring.setCornerRadius(dp(40));
+        ring.setColor(Color.TRANSPARENT);
+        ring.setStroke(Math.round(dp(1) * 1.8f), GlassSkin.TEXT);
+        android.graphics.drawable.LayerDrawable frame =
+                new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] {halo, ring});
+        int inset = Math.round(dp(1) * 0.8f);
+        frame.setLayerInset(1, inset, inset, inset, inset);
+        gps.setBackground(frame);
+        gps.setShadowLayer(dp(3), 0f, 0f, 0xCC000000);
+        FrameLayout.LayoutParams gpsLp = new FrameLayout.LayoutParams(dp(80), dp(34),
                 Gravity.BOTTOM | Gravity.RIGHT);
-        gpsLp.setMargins(0, 0, dp(6), dp(6));
+        gpsLp.setMargins(0, 0, dp(10), dp(9));
         surface.addView(gps, gpsLp);
         gps.setVisibility(View.GONE);
         gps.setOnClickListener(v -> {

@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.128 / versionCode 209**. Basis v0.31.127.
+- Die GPS-Taste behält ihren Text „◎  GPS“ und bekommt einen ovalen Rahmen im Stil des Info-Knopfs ⓘ (nur Linie mit dunklem Saum, keine Füllfläche). Der Ring mit Fadenkreuz aus v0.31.127 entfällt (GpsRingView gelöscht).
+
 - Version: **0.31.127 / versionCode 208**. Basis v0.31.126.
 - Die GPS-Taste (unten rechts auf der Karte) ist jetzt ein runder Ring mit Fadenkreuz in derselben Größe und Lage wie der Info-Knopf ⓘ links unten (ohne Hintergrundfläche, mit dunklem Saum für Lesbarkeit). Die Funktion (auf die GPS-Position zentrieren, Folgen einschalten) ist unverändert.
 
