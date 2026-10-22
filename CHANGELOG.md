@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.131 / versionCode 212**. Basis v0.31.130.
+- Positionsmarken verkleinert, weil sie auf dem Radio zu groß wirkten: Halloween-Kürbis jetzt 32 × 29 dp (vorher 48 × 44), Weihnachtsschlitten 24 × 40 dp (vorher 34 × 56). Der blaue Standard-Punkt bleibt bei 20 dp.
+
 - Version: **0.31.130 / versionCode 211**. Basis v0.31.129. Keine Funktionsänderung der App.
 - GitHub-Build: Die Debug-APK wurde mit einem eigenen, zufälligen Schlüssel signiert, obwohl das Secret DEBUG_KEYSTORE_BASE64 (Schlüssel D9:46:63:4A…) korrekt geladen war; deshalb ließ sie sich nicht über die bestehende App installieren. `app/build.gradle` trägt die Schlüsseldatei jetzt über `DEBUG_KEYSTORE_PATH` in `signingConfigs.debug` ein (nur wenn die Variable gesetzt ist, also nur im GitHub-Build). Der Workflow gibt Fingerabdrücke von Schlüssel und APK als Hinweis aus.
 
