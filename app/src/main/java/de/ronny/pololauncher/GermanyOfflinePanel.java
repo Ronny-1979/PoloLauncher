@@ -41,7 +41,7 @@ final class GermanyOfflinePanel {
     private final MapView view;
     private final View nightShade;
     private final MarkerArtView marker;
-    private final TextView gps;
+    private final View gps;
     private final TextView notice;
     private final GermanyOfflineAnalyzer analyzer;
     private final Runnable timeout;
@@ -119,16 +119,10 @@ final class GermanyOfflinePanel {
         surface.addView(marker, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
         applyMarkerStyle();
 
-        gps = new TextView(context);
-        gps.setText("◎  GPS");
-        gps.setTextSize(13);
-        gps.setTextColor(GlassSkin.TEXT);
-        gps.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        gps.setGravity(Gravity.CENTER);
-        // No filled chip: transparent, with a soft shadow so the text stays readable on the map.
-        gps.setBackground(null);
-        gps.setShadowLayer(dp(3), 0f, 0f, 0xCC000000);
-        FrameLayout.LayoutParams gpsLp = new FrameLayout.LayoutParams(dp(76), dp(40),
+        gps = new GpsRingView(context, context.getResources().getDisplayMetrics().density);
+        gps.setContentDescription("Auf GPS-Position zentrieren");
+        // Gleiche Größe und Lage wie der Info-Knopf links unten, nur spiegelbildlich rechts.
+        FrameLayout.LayoutParams gpsLp = new FrameLayout.LayoutParams(dp(40), dp(40),
                 Gravity.BOTTOM | Gravity.RIGHT);
         gpsLp.setMargins(0, 0, dp(6), dp(6));
         surface.addView(gps, gpsLp);

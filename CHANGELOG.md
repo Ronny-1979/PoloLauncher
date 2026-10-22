@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+- Version: **0.31.127 / versionCode 208**. Basis v0.31.126.
+- Die GPS-Taste (unten rechts auf der Karte) ist jetzt ein runder Ring mit Fadenkreuz in derselben Größe und Lage wie der Info-Knopf ⓘ links unten (ohne Hintergrundfläche, mit dunklem Saum für Lesbarkeit). Die Funktion (auf die GPS-Position zentrieren, Folgen einschalten) ist unverändert.
+
 - Version: **0.31.126 / versionCode 207**. Basis v0.31.125.
 - Weihnachtsschlitten: der Weihnachtsmann ist jetzt als Gestalt mit roter Zipfelmütze und weißem Bommel gezeichnet statt als Kreis-Ziel. Sonst unverändert.
 

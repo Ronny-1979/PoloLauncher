@@ -1,4 +1,4 @@
-# Testbericht v0.31.126 (wöchentliche Karten-Update-Prüfung mit Popup)
+# Testbericht v0.31.127 (wöchentliche Karten-Update-Prüfung mit Popup)
 
 Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tests.sh grün; kein Android-Build, nicht am Radio getestet.
 
@@ -79,3 +79,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.125
 - Positionsmarke (Standard/Kürbis/Schlitten): Auswahllogik per MarkerStyleTest geprüft; das Zeichnen (Canvas) und das Menü sind nur gegen die Android-API kompiliert, nicht auf dem Radio gesehen.
+
+## Nachtrag v0.31.127
+- GPS-Taste als Ring mit Fadenkreuz (GpsRingView). Zeichnung mit einer Java2D-Nachbildung der Canvas-Aufrufe geprüft, Klassen gegen die Android-API kompiliert, auf dem Radio nicht gesehen.
