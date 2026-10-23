@@ -112,7 +112,7 @@ public final class MapSettingsActivity extends Activity {
         addColorMode(colorModes, "Tag", MapPreferences.COLOR_DAY);
         addColorMode(colorModes, "Nacht", MapPreferences.COLOR_NIGHT);
         root.addView(colorModes, new LinearLayout.LayoutParams(-1, dp(52)));
-        root.addView(hint("Automatisch schaltet mit Sonnenaufgang und Sonnenuntergang an der GPS-Position. Wirkt auf die Karte."));
+        root.addView(hint("Automatisch schaltet morgens mit dem Sonnenaufgang auf Tag und abends 30 Minuten vor Sonnenuntergang auf Nacht (GPS-Position). Wirkt auf die Karte."));
         refreshColorMode();
 
         section(root, "FAHRTRICHTUNG");

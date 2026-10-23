@@ -98,3 +98,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 ## Nachtrag v0.31.132
 - Neu: MapResumePolicyTest (Fehlerklassifizierung transient/fatal, Wartezeiten, Range-Fortsetzpunkt). Direkt-Ortsgrenze-Schalter und Reste entfernt, SettlementZoomGateTest/SourceAuditTest angepasst.
 - Nicht am Radio getestet: Range-Fortsetzung gegen den echten Server, Alarm-Wiederaufnahme im Standby (Android kann Hintergrundstarts blockieren).
+
+## Nachtrag v0.31.133
+- SolarDaylightTest: Nachtmodus 30 min vor Sonnenuntergang, morgens unverändert am Sonnenaufgang. Nicht im Auto getestet.

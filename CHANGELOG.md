@@ -1,5 +1,8 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
+
+- Version: **0.31.133 / versionCode 214**. Basis v0.31.132.
+- Nacht-Automatik: Abends schaltet die Karte jetzt 30 Minuten vor Sonnenuntergang auf Nachtmodus. Morgens bleibt es beim Sonnenaufgang (Umschalten auf Tag).
 - Version: **0.31.132 / versionCode 213**. Basis v0.31.131.
 - Karten-Update läuft von selbst weiter: Bricht die Verbindung ab (z. B. Standby, Funkloch, „SocketException“), wird das nicht mehr als Fehler beendet. Der Dienst wartet (15 s, 30 s, 1, 2, 5, max. 10 min) und macht an derselben Stelle weiter. Zusätzlich weckt ein Alarm alle ~10 Minuten die App, falls Android den Dienst beendet hat; beim Einschalten des Radios und beim Start des Launchers wird ebenfalls fortgesetzt, bis alles fertig ist. Der Wunsch „Update läuft“ bleibt bis zum Ende gespeichert.
 - Downloads setzen exakt am Abbruchpunkt fort (HTTP-Range mit If-Range): halb geladene Karten und OSM-Rohdaten werden nicht mehr von vorn geladen. Hat sich die Datei auf dem Server geändert, beginnt nur diese eine Datei neu.

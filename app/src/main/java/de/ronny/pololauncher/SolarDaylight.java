@@ -8,6 +8,8 @@ package de.ronny.pololauncher;
  */
 final class SolarDaylight {
     private static final double APPARENT_SUNSET_DEGREES = -0.833d;
+    /** In the evening the night theme starts this long before the apparent sunset (not in the morning). */
+    static final long EVENING_LEAD_MS = 30L * 60_000L;
 
     private SolarDaylight() {}
 
@@ -15,7 +17,11 @@ final class SolarDaylight {
         if (!finite(latitude) || !finite(longitude)
                 || latitude < -90d || latitude > 90d
                 || longitude < -180d || longitude > 180d) return false;
-        return elevationDegrees(epochMillis, latitude, longitude) < APPARENT_SUNSET_DEGREES;
+        double now = elevationDegrees(epochMillis, latitude, longitude);
+        if (now < APPARENT_SUNSET_DEGREES) return true;
+        // Sun still up: switch EVENING_LEAD_MS early, but only while the sun is going down.
+        double soon = elevationDegrees(epochMillis + EVENING_LEAD_MS, latitude, longitude);
+        return soon < APPARENT_SUNSET_DEGREES && soon < now;
     }
 
     static double elevationDegrees(long epochMillis, double latitude, double longitude) {

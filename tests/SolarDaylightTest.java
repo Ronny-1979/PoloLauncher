@@ -20,6 +20,16 @@ public final class SolarDaylightTest {
                 "winter evening in Saxony is night");
         check(!SolarDaylight.isNight(Instant.parse("2026-06-21T12:00:00Z").toEpochMilli(), Double.NaN, longitude),
                 "invalid position fails safely to day mode");
+        long noon = Instant.parse("2026-10-23T11:00:00Z").toEpochMilli();
+        long sunset = noon;
+        while (SolarDaylight.elevationDegrees(sunset, latitude, longitude) >= -0.833d) sunset += 60_000L;
+        check(!SolarDaylight.isNight(sunset - 31L * 60_000L, latitude, longitude), "31 min before sunset still day");
+        check(SolarDaylight.isNight(sunset - 29L * 60_000L, latitude, longitude), "29 min before sunset is night");
+        long sunrise = noon;
+        while (SolarDaylight.elevationDegrees(sunrise, latitude, longitude) >= -0.833d) sunrise -= 60_000L;
+        sunrise += 60_000L; // first minute of day
+        check(SolarDaylight.isNight(sunrise - 5L * 60_000L, latitude, longitude), "morning: night until sunrise");
+        check(!SolarDaylight.isNight(sunrise + 5L * 60_000L, latitude, longitude), "morning: day after sunrise");
         System.out.println("SolarDaylightTest passed");
     }
 }
