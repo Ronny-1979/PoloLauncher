@@ -516,19 +516,38 @@ public final class GermanyOfflineService extends Service {
             long size = remote.size > 0L ? remote.size : pbf.length();
 
             TrafficPbfScanner.Stats stats;
-            try (TrafficDataStore.Builder builder = new TrafficDataStore.Builder(tempDb)) {
-                stats = TrafficPbfScanner.scan(pbf, builder, new TrafficPbfScanner.Progress() {
-                    @Override public boolean cancelled() { return GermanyOfflineService.this.cancelled; }
-                    @Override public void update(String phase, long count, String detail) {
-                        TrafficDataManager.setActive(GermanyOfflineService.this, region,
-                                "ANALYSE".equals(phase) ? TrafficDataManager.PHASE_ANALYSE
-                                        : TrafficDataManager.PHASE_BUILD);
-                        progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps,
-                                count, 0L, "Verkehr " + name + ": " + detail);
-                    }
-                }, false);
-                checkCancelled();
-                builder.finish(region, modified, size, "speed-camera");
+            try {
+                try (TrafficDataStore.Builder builder = new TrafficDataStore.Builder(tempDb)) {
+                    stats = TrafficPbfScanner.scan(pbf, builder, new TrafficPbfScanner.Progress() {
+                        @Override public boolean cancelled() { return GermanyOfflineService.this.cancelled; }
+                        @Override public void update(String phase, long count, String detail) {
+                            TrafficDataManager.setActive(GermanyOfflineService.this, region,
+                                    "ANALYSE".equals(phase) ? TrafficDataManager.PHASE_ANALYSE
+                                            : TrafficDataManager.PHASE_BUILD);
+                            progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps,
+                                    count, 0L, "Verkehr " + name + ": " + detail);
+                        }
+                    }, false);
+                    checkCancelled();
+                    builder.finish(region, modified, size, "speed-camera");
+                }
+            } catch (TrafficPbfScanner.Cancelled cancelledError) {
+                throw cancelledError;
+            } catch (RuntimeException dataError) {
+                if (cancelled) throw dataError;
+                // Parser blew up on the raw data (e.g. NegativeArraySizeException): the PBF is damaged.
+                // Keeping it would fail the same way forever, so throw it away and download it again.
+                completeSource = false;
+                keepPartial = false;
+                pbf.delete();
+                new File(pbf.getAbsolutePath() + ".pos").delete();
+                if (++invalidRetries <= 2) {
+                    DiagLog.add("Deutschland Verkehr " + name + ": OSM-Rohdaten defekt ("
+                            + dataError.getClass().getSimpleName() + " " + dataError.getMessage()
+                            + ") – werden komplett neu geladen (Versuch " + invalidRetries + "/2)");
+                    throw new java.io.IOException("OSM-Rohdaten defekt: " + name + " – neu laden");
+                }
+                throw dataError;
             }
             checkCancelled();
             if (!TrafficDataStore.atomicActivate(this, region, tempDb))

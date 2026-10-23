@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.135 / versionCode 216**. Basis v0.31.134.
+- Straßenauswertung: Brach der Parser mit „NegativeArraySizeException“ ab (defekte OSM-Rohdatei), blieb die kaputte Datei liegen und derselbe Fehler kam bei jedem Neustart. Jetzt wird die defekte Rohdatei gelöscht und automatisch neu geladen (bis zu 2 Mal je Lauf); erst danach erscheint ein Fehler.
+
 - Version: **0.31.134 / versionCode 215**. Basis v0.31.133.
 - Karten-Download robuster: Nach „MBTiles ungültig: Baden-Württemberg“ (Download komplett 534 MB, aber Datei defekt – vermutlich nach hartem Ausschalten mitten im Schreiben) wird die defekte Datei jetzt verworfen und automatisch neu geladen (bis zu 2 Mal je Lauf). Fortsetzen geschieht nur noch ab dem Punkt, der nachweislich auf den Speicher geschrieben wurde (fsync alle 8 MB plus Positionsdatei `.pos`); alles dahinter wird neu geholt. Alte Teil-Downloads ohne Positionsdatei beginnen einmalig neu.
 
