@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.134 / versionCode 215**. Basis v0.31.133.
+- Karten-Download robuster: Nach „MBTiles ungültig: Baden-Württemberg“ (Download komplett 534 MB, aber Datei defekt – vermutlich nach hartem Ausschalten mitten im Schreiben) wird die defekte Datei jetzt verworfen und automatisch neu geladen (bis zu 2 Mal je Lauf). Fortsetzen geschieht nur noch ab dem Punkt, der nachweislich auf den Speicher geschrieben wurde (fsync alle 8 MB plus Positionsdatei `.pos`); alles dahinter wird neu geholt. Alte Teil-Downloads ohne Positionsdatei beginnen einmalig neu.
+
 - Version: **0.31.133 / versionCode 214**. Basis v0.31.132.
 - Nacht-Automatik: Abends schaltet die Karte jetzt 30 Minuten vor Sonnenuntergang auf Nachtmodus. Morgens bleibt es beim Sonnenaufgang (Umschalten auf Tag).
 - Version: **0.31.132 / versionCode 213**. Basis v0.31.131.

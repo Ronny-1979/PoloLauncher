@@ -39,6 +39,7 @@ public final class GermanyOfflineService extends Service {
     private volatile boolean cancelled;
     private volatile int consecutiveFailures;
     private int totalRetries;
+    private int invalidRetries;
     private volatile String lastPhase = GermanyOfflineStore.PHASE_MAP;
     private volatile int lastStep, lastSteps;
     private volatile boolean userCancelled;
@@ -89,6 +90,7 @@ public final class GermanyOfflineService extends Service {
         cancelled = false;
         userCancelled = false;
         totalRetries = 0;
+        invalidRetries = 0;
         consecutiveFailures = 0;
         serviceDestroying = false;
         updateExisting = intent != null
@@ -298,7 +300,16 @@ public final class GermanyOfflineService extends Service {
                         "Karte " + name + ": " + GermanyOfflineStore.humanBytes(done)
                                 + (total > 0L ? " / " + GermanyOfflineStore.humanBytes(total) : "")));
         checkCancelled();
-        if (!validMbtiles(part)) throw new IllegalStateException("MBTiles ungültig: " + name);
+        if (!validMbtiles(part)) {
+            part.delete();
+            new File(part.getAbsolutePath() + ".pos").delete();
+            if (++invalidRetries <= 2) {
+                DiagLog.add("Deutschland Karte " + name + ": Download ungültig – wird komplett neu geladen (Versuch "
+                        + invalidRetries + "/2)");
+                throw new java.io.IOException("MBTiles ungültig: " + name + " – neu laden");
+            }
+            throw new IllegalStateException("MBTiles ungültig: " + name);
+        }
         atomicReplace(part, target);
         if (remote.modified > 0L) target.setLastModified(remote.modified);
     }
@@ -581,10 +592,21 @@ public final class GermanyOfflineService extends Service {
             throw new IllegalStateException("Download-Ordner fehlt");
         // Continue an interrupted .part exactly where it stopped (Range + If-Range). If the server file
         // changed meanwhile, If-Range makes the server answer 200 with the full new file instead.
-        long offset = MapResumePolicy.resumeOffset(target.isFile() ? target.length() : 0L,
+        // Only bytes that were fsync'ed AND recorded in the ".pos" sidecar count: after a hard power-off
+        // the file length can be larger than the data really on flash (zero-filled tail -> corrupt MBTiles).
+        File posFile = new File(target.getAbsolutePath() + ".pos");
+        long safeLength = Math.min(target.isFile() ? target.length() : 0L, readPos(posFile));
+        long offset = MapResumePolicy.resumeOffset(safeLength,
                 head == null ? 0L : head.size, head == null ? 0L : head.modified);
-        if (offset == 0L && target.exists() && !target.delete())
-            throw new IllegalStateException("Temporäre Datei nicht löschbar");
+        if (offset == 0L) {
+            posFile.delete();
+            if (target.exists() && !target.delete())
+                throw new IllegalStateException("Temporäre Datei nicht löschbar");
+        } else if (target.length() > offset) {
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(target, "rw")) {
+                raf.setLength(offset);
+            }
+        }
 
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15_000);
@@ -615,20 +637,30 @@ public final class GermanyOfflineService extends Service {
             byte[] buffer = new byte[256 * 1024];
             long done = base, lastUi = base;
             try (BufferedInputStream input = new BufferedInputStream(connection.getInputStream(), buffer.length);
-                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(target, resumed), buffer.length)) {
+                 FileOutputStream fileOut = new FileOutputStream(target, resumed);
+                 BufferedOutputStream output = new BufferedOutputStream(fileOut, buffer.length)) {
                 int read;
+                long lastSync = base;
                 while ((read = input.read(buffer)) >= 0) {
                     checkCancelled();
                     if (read == 0) continue;
                     output.write(buffer, 0, read);
                     done += read;
+                    if (done - lastSync >= 8L * 1024L * 1024L) {
+                        output.flush();
+                        fileOut.getFD().sync();
+                        writePos(posFile, done);
+                        lastSync = done;
+                    }
                     if (done - lastUi >= 4L * 1024L * 1024L) {
                         lastUi = done;
                         progress.update(done, total);
                     }
                 }
                 output.flush();
+                fileOut.getFD().sync();
             }
+            posFile.delete();
             progress.update(done, total);
             if (total > 0L && done != total)
                 throw new IllegalStateException("Download unvollständig (" + done + "/" + total + ")");
@@ -636,6 +668,21 @@ public final class GermanyOfflineService extends Service {
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static long readPos(File f) {
+        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(f))) {
+            String line = r.readLine();
+            return line == null ? 0L : Math.max(0L, Long.parseLong(line.trim()));
+        } catch (Throwable ignored) { return 0L; }
+    }
+
+    private static void writePos(File f, long value) {
+        try (FileOutputStream out = new FileOutputStream(f)) {
+            out.write(Long.toString(value).getBytes("UTF-8"));
+            out.flush();
+            out.getFD().sync();
+        } catch (Throwable ignored) {}
     }
 
     private static String httpDate(long millis) {

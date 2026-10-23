@@ -101,3 +101,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.133
 - SolarDaylightTest: Nachtmodus 30 min vor Sonnenuntergang, morgens unverändert am Sonnenaufgang. Nicht im Auto getestet.
+
+## Nachtrag v0.31.134
+- Download mit fsync/.pos-Sidecar und automatischem Neuladen bei ungültigem MBTiles. Tests/Compile gruen; nicht am Radio getestet.
