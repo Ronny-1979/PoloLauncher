@@ -1,6 +1,10 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.136 / versionCode 217**. Basis v0.31.135.
+- Fahrzeugkachel: Die Felder „Gurt“ und „Wasser“ sind entfallen. An ihrer Stelle stehen die E10-Preise der Marktkauf-Tankstelle in Oschatz und der HEM in Dahlen (günstigere grün, geschlossen/veraltet grau). Quelle: Tankerkönig (MTS-K, CC BY 4.0); Abruf alle 10 Minuten, letzte Preise bleiben offline gespeichert; Tippen auf die Felder öffnet die Einstellungen. Der kostenlose API-Schlüssel wird unter Einstellungen → Tank, Verbrauch & OBD → „Tankstellen-Preise“ eingetragen. Die Stations-IDs sucht die App selbst anhand von Name und Ort.
+- Karte: Neue blaue Warnung „Waschwasser leer“ unter Tür- und Gurtwarnung, solange der Behälter als niedrig gemeldet wird (3 s entprellt). Die Gurtwarnung bleibt wie bisher.
+
 - Version: **0.31.135 / versionCode 216**. Basis v0.31.134.
 - Straßenauswertung: Brach der Parser mit „NegativeArraySizeException“ ab (defekte OSM-Rohdatei), blieb die kaputte Datei liegen und derselbe Fehler kam bei jedem Neustart. Jetzt wird die defekte Rohdatei gelöscht und automatisch neu geladen (bis zu 2 Mal je Lauf); erst danach erscheint ein Fehler.
 

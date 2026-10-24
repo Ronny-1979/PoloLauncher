@@ -332,7 +332,21 @@ public final class MainActivity extends Activity {
     private final ImageView[] weatherDayIcon = new ImageView[WeatherForecast.FORECAST_DAYS];
     private final TextView[] weatherDayDescription = new TextView[WeatherForecast.FORECAST_DAYS];
     private final TextView[] weatherDayTemperature = new TextView[WeatherForecast.FORECAST_DAYS];
-    private TextView washer;
+    private TextView waterWarning;
+    private long washerLowSinceMs;
+    private final TextView[] fuelValue = new TextView[FuelPriceLogic.LABELS.length];
+    private final FuelPriceClient fuelClient = new FuelPriceClient();
+    private boolean fuelRequestInFlight;
+    private long lastFuelAttemptElapsed;
+    private long fuelRetryAfterMs;
+    private final ExecutorService fuelLoader = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "launcher-fuel");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final long FUEL_REFRESH_MS = 10L * 60L * 1_000L;
+    private static final long FUEL_RETRY_MS = 2L * 60L * 1_000L;
+    private static final long FUEL_KEY_RETRY_MS = 30L * 60L * 1_000L;
     private TextView consumption;
     private TextView avgConsumptionView;
     private RangeBarView rangeBar;
@@ -344,7 +358,6 @@ public final class MainActivity extends Activity {
     private TextView dabPrevious;
     private TextView dabPlayPause;
     private TextView dabNext;
-    private TextView seatbeltStatus;
     private TextView warning;
     private TextView seatbeltWarning;
     private android.animation.ObjectAnimator seatbeltBlink;
@@ -427,6 +440,7 @@ public final class MainActivity extends Activity {
             updateMapConnection();
             maybeRefreshLocality();
             maybeRefreshWeather();
+            maybeRefreshFuel();
             String germanySignature = GermanyOfflineStore.signature(MainActivity.this);
             if (!loadedGermanySignature.equals(germanySignature) && !isFinishing()) {
                 DiagLog.add("Hauptseite neu: Deutschland-Offlinepaket geändert");
@@ -635,6 +649,19 @@ public final class MainActivity extends Activity {
         FrameLayout.LayoutParams beltLp = new FrameLayout.LayoutParams(-1, dp(42), Gravity.TOP);
         beltLp.setMargins(dp(10), dp(10), dp(10), 0);
         mapFrame.addView(seatbeltWarning, beltLp);
+
+        // Waschwasser-Warnung: erscheint solange der Behälter als niedrig/leer gemeldet wird.
+        waterWarning = label("⚠  Waschwasser leer", 14, Color.WHITE, Typeface.BOLD);
+        waterWarning.setGravity(Gravity.CENTER);
+        waterWarning.setMaxLines(1);
+        waterWarning.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        waterWarning.setAutoSizeTextTypeUniformWithConfiguration(
+                10, 14, 1, TypedValue.COMPLEX_UNIT_SP);
+        waterWarning.setVisibility(View.GONE);
+        waterWarning.setBackground(rounded(Color.argb(240, 21, 101, 192), dp(12), Color.TRANSPARENT, 0));
+        FrameLayout.LayoutParams waterLp = new FrameLayout.LayoutParams(-1, dp(42), Gravity.TOP);
+        waterLp.setMargins(dp(10), dp(10), dp(10), 0);
+        mapFrame.addView(waterWarning, waterLp);
 
         mapMode = label("", 10, GlassSkin.TEXT, Typeface.BOLD);
         mapMode.setMaxLines(1);
@@ -876,14 +903,16 @@ public final class MainActivity extends Activity {
         addVehicleTile(lower, "Ø 100 KM", avgConsumptionView, false);
         card.addView(lower, lp(-1, 0, 1.5f));
 
-        // Gurt und Wasser bleiben immer sichtbar.
+        // Gurt- und Wasserwarnung erscheinen auf der Karte. Hier stehen die beiden Tankstellen (E10).
         LinearLayout status = row();
         status.setPadding(0, dp(3), 0, 0);
-        seatbeltStatus = metricValue("--", GlassSkin.MUTED, 1);
-        washer = metricValue("--", GlassSkin.MUTED, 1);
-        addStatusChip(status, "Gurt", seatbeltStatus);
-        addStatusChip(status, "Wasser", washer);
+        for (int i = 0; i < fuelValue.length; i++) {
+            fuelValue[i] = metricValue("--", GlassSkin.MUTED, 1);
+            addStatusChip(status, FuelPriceLogic.LABELS[i], fuelValue[i]);
+        }
+        status.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
         card.addView(status, lp(-1, 0, 0.95f));
+        showFuelPrices();
         return card;
     }
 
@@ -1408,12 +1437,11 @@ public final class MainActivity extends Activity {
             setMetricState(outside, valid(s.outsideC)
                     ? String.format(Locale.GERMANY, "%.1f °C", s.outsideC) : "-- °C ALT",
                     valid(s.outsideC), s.outsideUpdatedAtMs > 0L);
-            updateWasherStatus(s);
-            updateSeatbeltStatus(s);
             updateSidebarStatus();
 
             showDoorWarning(s);
             showSeatbeltWarning(s);
+            showWaterWarning(s);
             // Event-driven: the watcher only retries registration here (cheap), no Binder call per tick.
             dabWatcher.poll();
             dabControlsStatus = dabWatcher.status();
@@ -1580,7 +1608,7 @@ public final class MainActivity extends Activity {
         boolean show = seatbeltAlert.update(s, VehicleRepository.now());
         if (show) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) seatbeltWarning.getLayoutParams();
-            int top = warning.getVisibility() == View.VISIBLE ? dp(58) : dp(10);
+            int top = bannerTop(warning);
             if (lp.topMargin != top) {
                 lp.topMargin = top;
                 seatbeltWarning.setLayoutParams(lp);
@@ -1601,21 +1629,110 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void updateSeatbeltStatus(VehicleState s) {
-        if (seatbeltStatus == null) return;
-        long age = VehicleRepository.now() - s.seatbeltUpdatedAtMs;
-        if (!s.seatbeltKnown || age < 0 || age > 15000L) {
-            setTextIfChanged(seatbeltStatus, "--");
-            setColorIfChanged(seatbeltStatus, GlassSkin.MUTED);
-        } else if (s.seatbeltOpen) {
-            setTextIfChanged(seatbeltStatus, "WARNUNG");
-            setColorIfChanged(seatbeltStatus, GlassSkin.WARNING);
-        } else {
-            // CAN has only a shared warning bit; no individual seat states.
-            setTextIfChanged(seatbeltStatus, "OK");
-            setColorIfChanged(seatbeltStatus, GlassSkin.GREEN);
+    /** Stacks the map banners: door, belt, water. Each visible banner above pushes this one down by 48 dp. */
+    private int bannerTop(View... above) {
+        int top = dp(10);
+        for (View v : above) if (v != null && v.getVisibility() == View.VISIBLE) top += dp(48);
+        return top;
+    }
+
+    /** Washer fluid low (CAN warning bit): orange-blue banner on the map, debounced 3 s against flicker. */
+    private void showWaterWarning(VehicleState s) {
+        if (waterWarning == null) return;
+        long now = VehicleRepository.now();
+        long age = now - s.washerUpdatedAtMs;
+        boolean low = s.washerKnown && age >= 0 && age <= 15000L && s.washerLow;
+        if (!low) washerLowSinceMs = 0L;
+        else if (washerLowSinceMs == 0L) washerLowSinceMs = now;
+        boolean show = low && now - washerLowSinceMs >= 3000L;
+        if (show) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) waterWarning.getLayoutParams();
+            int top = bannerTop(warning, seatbeltWarning);
+            if (lp.topMargin != top) {
+                lp.topMargin = top;
+                waterWarning.setLayoutParams(lp);
+            }
+            waterWarning.setVisibility(View.VISIBLE);
+        } else if (waterWarning.getVisibility() != View.GONE) {
+            waterWarning.setVisibility(View.GONE);
         }
-        seatbeltStatus.setContentDescription("Gurtstatus: " + seatbeltStatus.getText());
+    }
+
+    private void maybeRefreshFuel() {
+        if (fuelRequestInFlight) return;
+        String key = FuelPriceStore.apiKey(this);
+        if (key.isEmpty()) { showFuelPrices(); return; }
+        long nowElapsed = android.os.SystemClock.elapsedRealtime();
+        if (lastFuelAttemptElapsed != 0L && nowElapsed - lastFuelAttemptElapsed < fuelRetryAfterMs) return;
+        lastFuelAttemptElapsed = nowElapsed;
+        fuelRequestInFlight = true;
+        fuelLoader.execute(() -> {
+            long next = FUEL_REFRESH_MS;
+            try {
+                String[] ids = new String[FuelPriceLogic.LABELS.length];
+                boolean missing = false;
+                for (int i = 0; i < ids.length; i++) {
+                    ids[i] = FuelPriceStore.stationId(this, i);
+                    if (ids[i].isEmpty()) missing = true;
+                }
+                if (missing) {
+                    String[] found = fuelClient.resolveStations(key);
+                    for (int i = 0; i < ids.length; i++) {
+                        if (ids[i].isEmpty() && !found[i].isEmpty()) {
+                            ids[i] = found[i];
+                            FuelPriceStore.setStationId(this, i, found[i]);
+                        }
+                    }
+                }
+                FuelPriceClient.Result[] result = fuelClient.prices(key, ids);
+                for (int i = 0; i < result.length; i++)
+                    if (result[i] != null) FuelPriceStore.savePrice(this, i, result[i].e10, result[i].open);
+                FuelPriceStore.setNote(this, "");
+                for (String id : ids) if (id.isEmpty()) { next = FUEL_RETRY_MS * 5L; break; }
+            } catch (FuelPriceClient.KeyRejected e) {
+                FuelPriceStore.setNote(this, "Key ungültig");
+                DiagLog.add("Tankstellen: " + e.getMessage());
+                next = FUEL_KEY_RETRY_MS;
+            } catch (Throwable e) {
+                FuelPriceStore.setNote(this, "offline");
+                DiagLog.add("Tankstellen: Abruf fehlgeschlagen – " + e.getClass().getSimpleName()
+                        + (e.getMessage() == null ? "" : " " + e.getMessage()));
+                next = FUEL_RETRY_MS;
+            }
+            final long wait = next;
+            handler.post(() -> {
+                fuelRequestInFlight = false;
+                fuelRetryAfterMs = wait;
+                showFuelPrices();
+            });
+        });
+    }
+
+    private void showFuelPrices() {
+        boolean noKey = FuelPriceStore.apiKey(this).isEmpty();
+        double[] prices = new double[fuelValue.length];
+        for (int i = 0; i < fuelValue.length; i++) prices[i] = FuelPriceStore.price(this, i);
+        int cheaper = fuelValue.length == 2 ? FuelPriceLogic.cheaper(prices[0], prices[1]) : -1;
+        for (int i = 0; i < fuelValue.length; i++) {
+            if (fuelValue[i] == null) continue;
+            String text;
+            int color = GlassSkin.TEXT;
+            long age = WeatherStore.wallTimeMs() - FuelPriceStore.fetchedAt(this, i);
+            if (noKey) { text = "Key fehlt"; color = GlassSkin.MUTED; }
+            else if (Double.isNaN(prices[i])) {
+                text = FuelPriceStore.stationId(this, i).isEmpty() && !FuelPriceStore.note(this).isEmpty()
+                        ? FuelPriceStore.note(this) : "--";
+                color = GlassSkin.MUTED;
+            } else if (!FuelPriceStore.open(this, i)) { text = "geschlossen"; color = GlassSkin.MUTED; }
+            else {
+                text = "E10 " + FuelPriceLogic.price(prices[i]);
+                if (age < 0 || age > FuelPriceLogic.PRICE_STALE_MS) color = GlassSkin.MUTED;
+                else if (cheaper == i) color = GlassSkin.GREEN;
+            }
+            setTextIfChanged(fuelValue[i], text);
+            setColorIfChanged(fuelValue[i], color);
+            fuelValue[i].setContentDescription(FuelPriceLogic.LABELS[i] + ": " + text);
+        }
     }
 
     private final AverageDisplayFilter averageDisplayFilter = new AverageDisplayFilter();
@@ -1629,22 +1746,6 @@ public final class MainActivity extends Activity {
         setTextIfChanged(consumption, ConsumptionDisplay.instantaneous(s));
         setTextIfChanged(avgConsumptionView, valid(average)
                 ? String.format(Locale.GERMANY, "%.1f l", average) : "-- l");
-    }
-
-    private void updateWasherStatus(VehicleState s) {
-        if (washer == null) return;
-        long age = VehicleRepository.now() - s.washerUpdatedAtMs;
-        if (!s.washerKnown || age < 0 || age > 15000L) {
-            setTextIfChanged(washer, "--");
-            setColorIfChanged(washer, GlassSkin.MUTED);
-        } else if (s.washerLow) {
-            setTextIfChanged(washer, "NIEDRIG");
-            setColorIfChanged(washer, GlassSkin.WARNING);
-        } else {
-            // CAN provides a low-fluid warning bit, not the level in litres.
-            setTextIfChanged(washer, "OK");
-            setColorIfChanged(washer, GlassSkin.GREEN);
-        }
     }
 
     private TextView metricValue(String text, int color, int lines) {
@@ -2241,6 +2342,7 @@ public final class MainActivity extends Activity {
         MapFollowDiagnostics.event("Hauptseite onDestroy");
         iconLoader.shutdownNow();
         weatherLoader.shutdownNow();
+        fuelLoader.shutdownNow();
         if (dabWatcher != null) dabWatcher.stop();
         if (dabScreenReceiverRegistered) {
             unregisterReceiver(dabScreenReceiver);

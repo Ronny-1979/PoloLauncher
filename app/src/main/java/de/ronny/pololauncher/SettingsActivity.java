@@ -72,6 +72,13 @@ public final class SettingsActivity extends Activity {
         } else if (page.equals("Tank, Verbrauch & OBD")) {
         addButton(root, "Tank und Reichweite", () -> startActivity(new Intent(this, RangeSettingsActivity.class)));
         addButton(root, "OBD2-Adapter und Verbrauch", () -> startActivity(new Intent(this, Obd2SettingsActivity.class)));
+        addButton(root, "Tankstellen-Preise (Tankerkönig-Schlüssel)", this::editFuelKey);
+        TextView fuelNote = text("Zeigt E10 der Marktkauf-Tankstelle Oschatz und der HEM in Dahlen auf der Fahrzeugkachel. "
+                + "Dafür wird ein kostenloser API-Schlüssel von creativecommons.tankerkoenig.de benötigt. "
+                + "Preise: Tankerkönig / Markttransparenzstelle für Kraftstoffe (CC BY 4.0).",
+                12, GlassSkin.MUTED, Typeface.NORMAL);
+        fuelNote.setPadding(dp(4), dp(6), dp(4), dp(10));
+        root.addView(fuelNote);
         } else if (page.equals("Darstellung & Medien")) {
         section(root, "HINTERGRUND");
         backgroundStatus = text("", 13, GlassSkin.MUTED, Typeface.BOLD);
@@ -173,6 +180,22 @@ public final class SettingsActivity extends Activity {
         card.setMinHeight(dp(54));
         card.setLayoutParams(new LinearLayout.LayoutParams(card.getLayoutParams().width, -2));
         ((LinearLayout.LayoutParams) card.getLayoutParams()).topMargin = dp(5);
+    }
+
+    private void editFuelKey() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setSingleLine(true);
+        input.setText(FuelPriceStore.apiKey(this));
+        input.setHint("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+        GlassSkin.dialog(this)
+                .setTitle("Tankerkönig-API-Schlüssel")
+                .setView(input)
+                .setPositiveButton("Speichern", (d, w) -> {
+                    FuelPriceStore.setApiKey(this, input.getText().toString());
+                    Toast.makeText(this, "Gespeichert – Preise werden geladen", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Abbrechen", null)
+                .show();
     }
 
     private void navigateBack() {
