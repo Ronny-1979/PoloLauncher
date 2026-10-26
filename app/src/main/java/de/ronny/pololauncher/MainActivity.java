@@ -997,9 +997,9 @@ public final class MainActivity extends Activity {
         box.setBackground(GlassSkin.subtleChip(this));
         TextView heading = label(caption + "  ·  ", 13, GlassSkin.MUTED, Typeface.BOLD);
         heading.setMaxLines(1);
-        value.setTextSize(16);
+        value.setTextSize(13);
         value.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        value.setAutoSizeTextTypeUniformWithConfiguration(8, 16, 1, TypedValue.COMPLEX_UNIT_SP);
+        value.setAutoSizeTextTypeUniformWithConfiguration(8, 13, 1, TypedValue.COMPLEX_UNIT_SP);
         box.addView(heading);
         box.addView(value, lp(0, -1, 1f));
         LinearLayout.LayoutParams p = lp(0, -1, 1f);

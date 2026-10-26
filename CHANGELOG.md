@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.140 / versionCode 221**. Basis v0.31.139.
+- Tankstellenpreise haben dieselbe Schriftgröße (13 sp) wie der Name davor, vorher schrumpften sie automatisch. Kachelgrößen unverändert.
+
 - Version: **0.31.139 / versionCode 220**. Basis v0.31.138.
 - Tankstellenpreise ohne die letzte Stelle (9/10 Cent): 2,199 € wird als „2,19 €“ angezeigt (abgeschnitten, nicht gerundet).
 
