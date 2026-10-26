@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.138 / versionCode 219**. Basis v0.31.137.
+- Tankstellenfelder kürzer beschriftet: „MK-T“ (Marktkauf Oschatz) und „HEM“ (Dahlen).
+
 - Version: **0.31.137 / versionCode 218**. Basis v0.31.136.
 - Tankstellen-Preise größer dargestellt (Schrift 13/16 sp statt 9/10 sp); dafür sind die Kacheln Tempo und Drehzahl etwas niedriger.
 - Neu in Einstellungen → Tank, Verbrauch & OBD: „Tankstellen: Aktualisierung alle … Minuten“ mit 5, 10, 15, 20, 25 oder 30 Minuten (Standard 10).

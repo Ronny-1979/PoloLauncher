@@ -1,6 +1,6 @@
-# PoloLauncher v0.31.137 – Launcher für das Polo-Autoradio (Android 13)
+# PoloLauncher v0.31.138 – Launcher für das Polo-Autoradio (Android 13)
 
-Version **0.31.137 / versionCode 218**. Ein Android-Launcher für das Android-Autoradio im VW Polo 6R: Offline-Karte mit Tempolimits und Blitzern, Fahrzeugdaten, DAB-Radio und CarPlay-Übergabe auf einem Bildschirm. Der vollständige Änderungsverlauf steht in [CHANGELOG.md](CHANGELOG.md), der aktuelle Prüfbericht in `TESTBERICHT_v0.31.137.md`.
+Version **0.31.138 / versionCode 219**. Ein Android-Launcher für das Android-Autoradio im VW Polo 6R: Offline-Karte mit Tempolimits und Blitzern, Fahrzeugdaten, DAB-Radio und CarPlay-Übergabe auf einem Bildschirm. Der vollständige Änderungsverlauf steht in [CHANGELOG.md](CHANGELOG.md), der aktuelle Prüfbericht in `TESTBERICHT_v0.31.138.md`.
 
 ## Was die App kann
 

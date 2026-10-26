@@ -5,7 +5,7 @@ import java.util.Locale;
 /** Pure rules for the two fixed petrol stations: matching Tankerkönig list entries, formatting, comparison. */
 final class FuelPriceLogic {
     /** Fixed targets, in display order. */
-    static final String[] LABELS = {"Marktkauf", "HEM Dahlen"};
+    static final String[] LABELS = {"MK-T", "HEM"};
     static final String[] PLACES = {"oschatz", "dahlen"};
     /** Search centre between Oschatz and Dahlen (Sachsen) and radius in km (API maximum is 25). */
     static final double CENTER_LAT = 51.30d, CENTER_LNG = 13.05d;
