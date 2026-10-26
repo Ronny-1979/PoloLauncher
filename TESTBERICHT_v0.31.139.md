@@ -116,3 +116,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.138
 - Nur Beschriftung der Tankstellenfelder geaendert.
+
+## Nachtrag v0.31.139
+- Preisformat zwei Nachkommastellen (abgeschnitten); FuelPriceLogicTest angepasst.

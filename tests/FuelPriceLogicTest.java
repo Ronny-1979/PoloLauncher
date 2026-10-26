@@ -12,7 +12,9 @@ public class FuelPriceLogicTest {
         check(FuelPriceLogic.matches(1, "HEM", "HEM", "Dahlen"), "hem plain");
         check(!FuelPriceLogic.matches(1, "Schlehmann Tank", "", "Dahlen"), "hem substring only");
         check(!FuelPriceLogic.matches(1, "HEM", "HEM", "Oschatz"), "hem wrong town");
-        check(FuelPriceLogic.price(1.659d).equals("1,659 €"), "format " + FuelPriceLogic.price(1.659d));
+        check(FuelPriceLogic.price(1.659d).equals("1,65 €"), "format " + FuelPriceLogic.price(1.659d));
+        check(FuelPriceLogic.price(2.199d).equals("2,19 €"), "cut 2.199");
+        check(FuelPriceLogic.price(1.700d).equals("1,70 €"), "exact 1.70");
         check(FuelPriceLogic.price(Double.NaN).equals("--"), "nan");
         check(FuelPriceLogic.price(0d).equals("--"), "zero");
         check(FuelPriceLogic.cheaper(1.659d, 1.699d) == 0, "a cheaper");

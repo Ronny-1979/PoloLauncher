@@ -25,7 +25,9 @@ final class FuelPriceLogic {
 
     static String price(double euro) {
         if (!(euro > 0.5d) || euro > 9.999d) return "--";
-        return String.format(Locale.GERMANY, "%.3f €", euro);
+        // The pump's 9/10 cent is left out on purpose: 2,199 is shown as 2,19 (cut off, not rounded).
+        double cut = Math.floor(euro * 100d + 1e-6d) / 100d;
+        return String.format(Locale.GERMANY, "%.2f €", cut);
     }
 
     /** Index of the cheaper station among valid prices, or -1 if fewer than two valid prices / equal. */

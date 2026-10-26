@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.139 / versionCode 220**. Basis v0.31.138.
+- Tankstellenpreise ohne die letzte Stelle (9/10 Cent): 2,199 € wird als „2,19 €“ angezeigt (abgeschnitten, nicht gerundet).
+
 - Version: **0.31.138 / versionCode 219**. Basis v0.31.137.
 - Tankstellenfelder kürzer beschriftet: „MK-T“ (Marktkauf Oschatz) und „HEM“ (Dahlen).
 
