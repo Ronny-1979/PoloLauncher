@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.141 / versionCode 222**. Basis v0.31.140.
+- Die Tankstellenpreise (MK-T, HEM) haben eine eigene Glaskachel zwischen Fahrzeug- und Radiokachel; die Fahrzeugkachel endet unter „Aktuell“ und „Ø 100 KM“. Höhenverhältnis rechts: Fahrzeug 0,33 / Tankstellen 0,10 / DAB 0,57.
+
 - Version: **0.31.140 / versionCode 221**. Basis v0.31.139.
 - Tankstellenpreise haben dieselbe Schriftgröße (13 sp) wie der Name davor, vorher schrumpften sie automatisch. Kachelgrößen unverändert.
 

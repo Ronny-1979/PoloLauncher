@@ -698,11 +698,16 @@ public final class MainActivity extends Activity {
         // sitzen jetzt komplett in der schmaleren linken Leiste; dadurch haben Fahrzeug
         // und DAB deutlich mehr Höhe und wirken näher am CarPlay-Dashboard.
         LinearLayout vehicleCard = buildVehicleGlassCard();
-        LinearLayout.LayoutParams vehicleLp = lp(-1, 0, 0.40f);
+        LinearLayout.LayoutParams vehicleLp = lp(-1, 0, 0.33f);
         rightStack.addView(vehicleCard, vehicleLp);
 
+        LinearLayout fuelCard = buildFuelGlassCard();
+        LinearLayout.LayoutParams fuelLp = lp(-1, 0, 0.10f);
+        fuelLp.topMargin = dp(8);
+        rightStack.addView(fuelCard, fuelLp);
+
         LinearLayout dabCard = buildDabGlassCard();
-        LinearLayout.LayoutParams dabLp = lp(-1, 0, 0.60f);
+        LinearLayout.LayoutParams dabLp = lp(-1, 0, 0.57f);
         dabLp.topMargin = dp(8);
         rightStack.addView(dabCard, dabLp);
 
@@ -902,15 +907,23 @@ public final class MainActivity extends Activity {
         addVehicleTile(lower, "Ø 100 KM", avgConsumptionView, false);
         card.addView(lower, lp(-1, 0, 1.5f));
 
-        // Gurt- und Wasserwarnung erscheinen auf der Karte. Hier stehen die beiden Tankstellen (E10).
+        return card;
+    }
+
+    /** Eigene Glaskachel unter der Fahrzeugkachel: E10 der beiden Tankstellen (Gurt/Wasser warnen auf der Karte). */
+    private LinearLayout buildFuelGlassCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(9), dp(6), dp(9), dp(6));
+        card.setBackground(GlassSkin.panel(this, false));
+        card.setElevation(dp(7));
         LinearLayout status = row();
-        status.setPadding(0, dp(3), 0, 0);
         for (int i = 0; i < fuelValue.length; i++) {
             fuelValue[i] = metricValue("--", GlassSkin.MUTED, 1);
             addStatusChip(status, FuelPriceLogic.LABELS[i], fuelValue[i]);
         }
-        status.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
-        card.addView(status, lp(-1, 0, 1.4f));
+        card.addView(status, lp(-1, 0, 1f));
+        card.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
         showFuelPrices();
         return card;
     }

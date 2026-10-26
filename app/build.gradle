@@ -16,8 +16,8 @@ android {
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
-        versionCode 221
-        versionName '0.31.140'
+        versionCode 222
+        versionName '0.31.141'
     }
 
     buildFeatures {
