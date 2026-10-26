@@ -73,6 +73,8 @@ public final class SettingsActivity extends Activity {
         addButton(root, "Tank und Reichweite", () -> startActivity(new Intent(this, RangeSettingsActivity.class)));
         addButton(root, "OBD2-Adapter und Verbrauch", () -> startActivity(new Intent(this, Obd2SettingsActivity.class)));
         addButton(root, "Tankstellen-Preise (Tankerkönig-Schlüssel)", this::editFuelKey);
+        addButton(root, "Tankstellen: Aktualisierung alle " + FuelPriceStore.intervalMinutes(this) + " Minuten",
+                this::chooseFuelInterval);
         TextView fuelNote = text("Zeigt E10 der Marktkauf-Tankstelle Oschatz und der HEM in Dahlen auf der Fahrzeugkachel. "
                 + "Dafür wird ein kostenloser API-Schlüssel von creativecommons.tankerkoenig.de benötigt. "
                 + "Preise: Tankerkönig / Markttransparenzstelle für Kraftstoffe (CC BY 4.0).",
@@ -180,6 +182,25 @@ public final class SettingsActivity extends Activity {
         card.setMinHeight(dp(54));
         card.setLayoutParams(new LinearLayout.LayoutParams(card.getLayoutParams().width, -2));
         ((LinearLayout.LayoutParams) card.getLayoutParams()).topMargin = dp(5);
+    }
+
+    private void chooseFuelInterval() {
+        int[] options = FuelPriceStore.INTERVAL_MINUTES;
+        String[] labels = new String[options.length];
+        int checked = 0;
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = options[i] + " Minuten";
+            if (options[i] == FuelPriceStore.intervalMinutes(this)) checked = i;
+        }
+        GlassSkin.dialog(this)
+                .setTitle("Preise aktualisieren alle …")
+                .setSingleChoiceItems(labels, checked, (d, which) -> {
+                    FuelPriceStore.setIntervalMinutes(this, options[which]);
+                    d.dismiss();
+                    showPage(page);
+                })
+                .setNegativeButton("Abbrechen", null)
+                .show();
     }
 
     private void editFuelKey() {

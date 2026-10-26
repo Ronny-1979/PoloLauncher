@@ -20,6 +20,18 @@ final class FuelPriceStore {
         e.remove("note").apply();
     }
 
+    static final int[] INTERVAL_MINUTES = {5, 10, 15, 20, 25, 30};
+
+    static int intervalMinutes(Context c) {
+        int m = p(c).getInt("interval_min", 10);
+        for (int v : INTERVAL_MINUTES) if (v == m) return m;
+        return 10;
+    }
+
+    static void setIntervalMinutes(Context c, int minutes) { p(c).edit().putInt("interval_min", minutes).apply(); }
+
+    static long intervalMs(Context c) { return intervalMinutes(c) * 60_000L; }
+
     static String stationId(Context c, int i) { return p(c).getString("id_" + i, ""); }
 
     static void setStationId(Context c, int i, String id) { p(c).edit().putString("id_" + i, id).apply(); }

@@ -338,13 +338,12 @@ public final class MainActivity extends Activity {
     private final FuelPriceClient fuelClient = new FuelPriceClient();
     private boolean fuelRequestInFlight;
     private long lastFuelAttemptElapsed;
-    private long fuelRetryAfterMs;
+    private long fuelRetryAfterMs = -1L; // -1: last attempt ok, use the configured interval
     private final ExecutorService fuelLoader = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "launcher-fuel");
         thread.setDaemon(true);
         return thread;
     });
-    private static final long FUEL_REFRESH_MS = 10L * 60L * 1_000L;
     private static final long FUEL_RETRY_MS = 2L * 60L * 1_000L;
     private static final long FUEL_KEY_RETRY_MS = 30L * 60L * 1_000L;
     private TextView consumption;
@@ -897,7 +896,7 @@ public final class MainActivity extends Activity {
         LinearLayout upper = row();
         addVehicleTile(upper, "TEMPO", speed, true);
         addVehicleTile(upper, "DREHZAHL", rpm, true);
-        card.addView(upper, lp(-1, 0, 2.1f));
+        card.addView(upper, lp(-1, 0, 1.75f));
         LinearLayout lower = row();
         addVehicleTile(lower, "AKTUELL", consumption, false);
         addVehicleTile(lower, "Ø 100 KM", avgConsumptionView, false);
@@ -911,7 +910,7 @@ public final class MainActivity extends Activity {
             addStatusChip(status, FuelPriceLogic.LABELS[i], fuelValue[i]);
         }
         status.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
-        card.addView(status, lp(-1, 0, 0.95f));
+        card.addView(status, lp(-1, 0, 1.4f));
         showFuelPrices();
         return card;
     }
@@ -996,10 +995,11 @@ public final class MainActivity extends Activity {
         box.setGravity(Gravity.CENTER_VERTICAL);
         box.setPadding(dp(8), 0, dp(8), 0);
         box.setBackground(GlassSkin.subtleChip(this));
-        TextView heading = label(caption + "  ·  ", 9, GlassSkin.MUTED, Typeface.BOLD);
-        value.setTextSize(10);
+        TextView heading = label(caption + "  ·  ", 13, GlassSkin.MUTED, Typeface.BOLD);
+        heading.setMaxLines(1);
+        value.setTextSize(16);
         value.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        value.setAutoSizeTextTypeUniformWithConfiguration(6, 10, 1, TypedValue.COMPLEX_UNIT_SP);
+        value.setAutoSizeTextTypeUniformWithConfiguration(8, 16, 1, TypedValue.COMPLEX_UNIT_SP);
         box.addView(heading);
         box.addView(value, lp(0, -1, 1f));
         LinearLayout.LayoutParams p = lp(0, -1, 1f);
@@ -1663,11 +1663,12 @@ public final class MainActivity extends Activity {
         String key = FuelPriceStore.apiKey(this);
         if (key.isEmpty()) { showFuelPrices(); return; }
         long nowElapsed = android.os.SystemClock.elapsedRealtime();
-        if (lastFuelAttemptElapsed != 0L && nowElapsed - lastFuelAttemptElapsed < fuelRetryAfterMs) return;
+        long need = fuelRetryAfterMs < 0L ? FuelPriceStore.intervalMs(this) : fuelRetryAfterMs;
+        if (lastFuelAttemptElapsed != 0L && nowElapsed - lastFuelAttemptElapsed < need) return;
         lastFuelAttemptElapsed = nowElapsed;
         fuelRequestInFlight = true;
         fuelLoader.execute(() -> {
-            long next = FUEL_REFRESH_MS;
+            long next = -1L;
             try {
                 String[] ids = new String[FuelPriceLogic.LABELS.length];
                 boolean missing = false;

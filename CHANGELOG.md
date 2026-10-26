@@ -1,6 +1,10 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.137 / versionCode 218**. Basis v0.31.136.
+- Tankstellen-Preise größer dargestellt (Schrift 13/16 sp statt 9/10 sp); dafür sind die Kacheln Tempo und Drehzahl etwas niedriger.
+- Neu in Einstellungen → Tank, Verbrauch & OBD: „Tankstellen: Aktualisierung alle … Minuten“ mit 5, 10, 15, 20, 25 oder 30 Minuten (Standard 10).
+
 - Version: **0.31.136 / versionCode 217**. Basis v0.31.135.
 - Fahrzeugkachel: Die Felder „Gurt“ und „Wasser“ sind entfallen. An ihrer Stelle stehen die E10-Preise der Marktkauf-Tankstelle in Oschatz und der HEM in Dahlen (günstigere grün, geschlossen/veraltet grau). Quelle: Tankerkönig (MTS-K, CC BY 4.0); Abruf alle 10 Minuten, letzte Preise bleiben offline gespeichert; Tippen auf die Felder öffnet die Einstellungen. Der kostenlose API-Schlüssel wird unter Einstellungen → Tank, Verbrauch & OBD → „Tankstellen-Preise“ eingetragen. Die Stations-IDs sucht die App selbst anhand von Name und Ort.
 - Karte: Neue blaue Warnung „Waschwasser leer“ unter Tür- und Gurtwarnung, solange der Behälter als niedrig gemeldet wird (3 s entprellt). Die Gurtwarnung bleibt wie bisher.

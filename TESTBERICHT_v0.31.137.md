@@ -110,3 +110,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.136
 - FuelPriceLogicTest (Stationszuordnung, Format, Vergleich). Tankerkönig-Abruf und Wasserwarnung nicht am Radio/gegen die echte API getestet (kein Schlüssel).
+
+## Nachtrag v0.31.137
+- Layout/Intervall-Auswahl der Tankstellenfelder; Tests/Compile gruen, nicht am Radio getestet.
