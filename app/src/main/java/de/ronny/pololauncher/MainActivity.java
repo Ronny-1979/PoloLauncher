@@ -698,16 +698,16 @@ public final class MainActivity extends Activity {
         // sitzen jetzt komplett in der schmaleren linken Leiste; dadurch haben Fahrzeug
         // und DAB deutlich mehr Höhe und wirken näher am CarPlay-Dashboard.
         LinearLayout vehicleCard = buildVehicleGlassCard();
-        LinearLayout.LayoutParams vehicleLp = lp(-1, 0, 0.33f);
+        LinearLayout.LayoutParams vehicleLp = lp(-1, 0, 0.32f);
         rightStack.addView(vehicleCard, vehicleLp);
 
         LinearLayout fuelCard = buildFuelGlassCard();
-        LinearLayout.LayoutParams fuelLp = lp(-1, 0, 0.10f);
-        fuelLp.topMargin = dp(8);
+        LinearLayout.LayoutParams fuelLp = lp(-1, 0, 0.08f);
+        fuelLp.topMargin = dp(6);
         rightStack.addView(fuelCard, fuelLp);
 
         LinearLayout dabCard = buildDabGlassCard();
-        LinearLayout.LayoutParams dabLp = lp(-1, 0, 0.57f);
+        LinearLayout.LayoutParams dabLp = lp(-1, 0, 0.60f);
         dabLp.topMargin = dp(8);
         rightStack.addView(dabCard, dabLp);
 
@@ -914,7 +914,7 @@ public final class MainActivity extends Activity {
     private LinearLayout buildFuelGlassCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(9), dp(6), dp(9), dp(6));
+        card.setPadding(dp(8), dp(4), dp(8), dp(4));
         card.setBackground(GlassSkin.panel(this, false));
         card.setElevation(dp(7));
         LinearLayout status = row();

@@ -125,3 +125,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.141
 - Layout: eigene Tankstellenkachel. Tests/Compile gruen, Hoehenverhaeltnisse nicht am Radio geprueft.
+
+## Nachtrag v0.31.142
+- Layout-Anteile rechts angepasst (DAB nicht mehr abgeschnitten). Nicht am Radio getestet.

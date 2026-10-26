@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.142 / versionCode 223**. Basis v0.31.141.
+- Die Tankstellenkachel ist kleiner (weniger Innenabstand), und die DAB-Kachel hat wieder ihre volle Höhe, damit die Tasten unten nicht abgeschnitten werden. Höhenverhältnis rechts: Fahrzeug 0,32 / Tankstellen 0,08 / DAB 0,60 (DAB wie vor v0.31.141).
+
 - Version: **0.31.141 / versionCode 222**. Basis v0.31.140.
 - Die Tankstellenpreise (MK-T, HEM) haben eine eigene Glaskachel zwischen Fahrzeug- und Radiokachel; die Fahrzeugkachel endet unter „Aktuell“ und „Ø 100 KM“. Höhenverhältnis rechts: Fahrzeug 0,33 / Tankstellen 0,10 / DAB 0,57.
 
