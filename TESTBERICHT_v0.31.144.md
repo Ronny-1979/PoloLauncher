@@ -131,3 +131,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.143
 - Zoom-Gleiten in GermanyOfflinePanel; Tests/Compile gruen. Fluessigkeit nur auf dem Radio pruefbar.
+
+## Nachtrag v0.31.144
+- Zoomgeschwindigkeit 0,5 Stufen/s. Tests/Compile gruen, nicht am Radio getestet.

@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.144 / versionCode 225**. Basis v0.31.143.
+- Der automatische Zoom an der Ortsgrenze läuft sanfter und langsamer: 0,5 statt 0,9 Zoomstufen pro Sekunde (zwei Stufen dauern etwa 4 s). Das Nachziehen im Stand dauert 1,8 s.
+
 - Version: **0.31.143 / versionCode 224**. Basis v0.31.142.
 - Automatisches Ein-/Auszoomen (Ortsgrenze) ruckelte, weil jede Zoomstufe als harter Sprung (moveCamera) alle 0,5 s kam und dabei die laufende Gleitbewegung der Karte abbrach (zwei Ruckler pro Wechsel). Jetzt gleitet der Zoom mit der normalen Kartenbewegung pro GPS-Fix mit höchstens 0,9 Stufen pro Sekunde zum Ziel; nur im Stand erledigt ein einzelnes weiches Easing den Rest.
 

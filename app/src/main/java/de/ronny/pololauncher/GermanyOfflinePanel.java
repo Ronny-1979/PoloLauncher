@@ -85,7 +85,7 @@ final class GermanyOfflinePanel {
     private Runnable zoomStep;
     /** Wanted zoom level while a settlement/outside change is gliding in; -1 = none. Applied inside the per-fix glide. */
     private int zoomGoal = -1;
-    private static final double ZOOM_LEVELS_PER_SECOND = 0.9d;
+    private static final double ZOOM_LEVELS_PER_SECOND = 0.5d;
     private Consumer<Location> locationConsumer;
 
     GermanyOfflinePanel(Context context, FrameLayout surface, Runnable stateChanged, boolean nightMode) {
@@ -732,10 +732,10 @@ final class GermanyOfflinePanel {
                 zoomGoal = -1;
                 if (!visible || !following || !cameraReady()) return;
                 if (Math.abs(map.getCameraPosition().zoom - goal) < 0.05d) return;
-                map.easeCamera(CameraUpdateFactory.zoomTo(goal), 900, false);
+                map.easeCamera(CameraUpdateFactory.zoomTo(goal), 1_800, false);
             }
         };
-        surface.postDelayed(zoomStep, 2_500L);
+        surface.postDelayed(zoomStep, 4_500L);
     }
 
     private void fail(String detail) {
