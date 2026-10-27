@@ -187,8 +187,9 @@ if ! grep -Fq 'if (!visible || !following || !cameraReady()) return;' "$germany_
   exit 1
 fi
 if ! grep -Fq 'changeZoom(wantedZoom());' "$germany_panel" || \
-   ! grep -Fq 'surface.postDelayed(this, 500L);' "$germany_panel"; then
-  echo "SachsenFollowParityTest: FEHLER - Ortszoom ist nicht mehr getrennt von GPS-Positionsbewegung" >&2
+   ! grep -Fq 'ZOOM_LEVELS_PER_SECOND * duration' "$germany_panel" || \
+   grep -Fq 'surface.postDelayed(this, 500L);' "$germany_panel"; then
+  echo "SachsenFollowParityTest: FEHLER - Ortszoom gleitet nicht mit der GPS-Bewegung (oder alte 500-ms-Hartspruenge sind zurueck)" >&2
   exit 1
 fi
 echo "SachsenFollowParityTest: raw analysis + filtered camera + v0.31.49 follow thresholds configured"

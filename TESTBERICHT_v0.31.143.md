@@ -128,3 +128,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.142
 - Layout-Anteile rechts angepasst (DAB nicht mehr abgeschnitten). Nicht am Radio getestet.
+
+## Nachtrag v0.31.143
+- Zoom-Gleiten in GermanyOfflinePanel; Tests/Compile gruen. Fluessigkeit nur auf dem Radio pruefbar.

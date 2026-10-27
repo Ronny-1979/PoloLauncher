@@ -83,6 +83,9 @@ final class GermanyOfflinePanel {
     private long lastMoveAtMs;
     private final CameraAim cameraAim = new CameraAim();
     private Runnable zoomStep;
+    /** Wanted zoom level while a settlement/outside change is gliding in; -1 = none. Applied inside the per-fix glide. */
+    private int zoomGoal = -1;
+    private static final double ZOOM_LEVELS_PER_SECOND = 0.9d;
     private Consumer<Location> locationConsumer;
 
     GermanyOfflinePanel(Context context, FrameLayout surface, Runnable stateChanged, boolean nightMode) {
@@ -670,6 +673,23 @@ final class GermanyOfflinePanel {
         if (glide) smoothIntervalMs = smoothIntervalMs == 0d ? interval : 0.6d * smoothIntervalMs + 0.4d * interval;
         else smoothIntervalMs = 0d;
         long duration = Math.max(450L, Math.min(2_500L, Math.round((smoothIntervalMs > 0d ? smoothIntervalMs : interval) * 1.1d)));
+        // Zoom changes (town in/out) are folded into the same continuous glide instead of separate
+        // hard 1-level jumps: no extra stutters, and the per-fix ease no longer fights a stepped zoom.
+        if (zoomGoal > 0) {
+            if (!glide) {
+                zoom = zoomGoal;
+                zoomGoal = -1;
+            } else {
+                double diff = zoomGoal - zoom;
+                double maxStep = ZOOM_LEVELS_PER_SECOND * duration / 1000d;
+                if (Math.abs(diff) <= Math.max(0.02d, maxStep)) {
+                    zoom = zoomGoal;
+                    zoomGoal = -1;
+                } else {
+                    zoom += Math.signum(diff) * maxStep;
+                }
+            }
+        }
         double bearing;
         if (glide && MapPreferences.headingUp(context) && course.known()) {
             bearing = bearingSmoother.next(current.bearing, targetBearing, interval);
@@ -694,25 +714,28 @@ final class GermanyOfflinePanel {
     private void cancelZoomStep() {
         if (zoomStep != null) surface.removeCallbacks(zoomStep);
         zoomStep = null;
+        zoomGoal = -1;
     }
 
+    /**
+     * Sets the new zoom goal. The following GPS fixes glide towards it together with the position.
+     * Only if no fix arrives (standing still, glide impossible) a single smooth ease finishes the job.
+     */
     private void changeZoom(int wanted) {
         cancelZoomStep();
+        zoomGoal = wanted;
         zoomStep = new Runnable() {
             @Override public void run() {
-                if (!visible || !following || !cameraReady()) {
-                    zoomStep = null;
-                    return;
-                }
-                double current = map.getCameraPosition().zoom;
-                if (Math.abs(current - wanted) < 0.1d) { zoomStep = null; return; }
-                double next = current + Math.signum(wanted - current);
-                if ((wanted > current && next > wanted) || (wanted < current && next < wanted)) next = wanted;
-                map.moveCamera(CameraUpdateFactory.zoomTo(next));
-                surface.postDelayed(this, 500L);
+                zoomStep = null;
+                if (zoomGoal < 0) return; // already reached through the fix glide
+                int goal = zoomGoal;
+                zoomGoal = -1;
+                if (!visible || !following || !cameraReady()) return;
+                if (Math.abs(map.getCameraPosition().zoom - goal) < 0.05d) return;
+                map.easeCamera(CameraUpdateFactory.zoomTo(goal), 900, false);
             }
         };
-        surface.post(zoomStep);
+        surface.postDelayed(zoomStep, 2_500L);
     }
 
     private void fail(String detail) {

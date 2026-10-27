@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.143 / versionCode 224**. Basis v0.31.142.
+- Automatisches Ein-/Auszoomen (Ortsgrenze) ruckelte, weil jede Zoomstufe als harter Sprung (moveCamera) alle 0,5 s kam und dabei die laufende Gleitbewegung der Karte abbrach (zwei Ruckler pro Wechsel). Jetzt gleitet der Zoom mit der normalen Kartenbewegung pro GPS-Fix mit höchstens 0,9 Stufen pro Sekunde zum Ziel; nur im Stand erledigt ein einzelnes weiches Easing den Rest.
+
 - Version: **0.31.142 / versionCode 223**. Basis v0.31.141.
 - Die Tankstellenkachel ist kleiner (weniger Innenabstand), und die DAB-Kachel hat wieder ihre volle Höhe, damit die Tasten unten nicht abgeschnitten werden. Höhenverhältnis rechts: Fahrzeug 0,32 / Tankstellen 0,08 / DAB 0,60 (DAB wie vor v0.31.141).
 
