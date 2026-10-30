@@ -1,6 +1,9 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.146 / versionCode 227**. Basis v0.31.145.
+- Menü-Umbau von v0.31.145 zurückgenommen: Das gewohnte Menü (v0.31.144) ist wieder da. Neu nur: Schieberegler sind schmaler (ca. 55 % der Breite), rechts bleibt freie Fläche zum Scrollen, damit man sie beim Wischen nicht versehentlich verstellt.
+
 - Version: **0.31.145 / versionCode 226**. Basis v0.31.144.
 - Menü komplett neu geordnet und ohne Slider: Alle Einstellungen werden nur noch per Tipp bedient. Beim Scrollen kann nichts mehr versehentlich verstellt werden.
 - Schieberegler ersetzt durch Stufen-Tasten (− / +): Neigung, Gebäudehöhe, Zoom innerorts/außerorts, Reserve, Tankpreis-Intervall (5–30 Min.). Wischschalter ersetzt durch große Ein/Aus-Zeilen (ganze Zeile tippbar). Kartenmodus und Positionsmarke als Auswahlknöpfe.

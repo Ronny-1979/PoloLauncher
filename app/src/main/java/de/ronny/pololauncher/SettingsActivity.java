@@ -58,92 +58,113 @@ public final class SettingsActivity extends Activity {
         root.setPadding(dp(20), dp(10), dp(20), dp(14));
         scroll.addView(root);
 
-        root.addView(SettingsUi.title(this, page.isEmpty() ? "EINSTELLUNGEN" : page.toUpperCase(java.util.Locale.GERMANY)),
-                new LinearLayout.LayoutParams(-1, dp(46)));
+        root.addView(text(page.isEmpty() ? "EINSTELLUNGEN" : page, 25, GlassSkin.TEXT, Typeface.BOLD),
+                new LinearLayout.LayoutParams(-1, dp(40)));
         if (page.isEmpty()) {
             addCategory(root, "Karte & GPS", "Kartenstil · Zoom · Fahrtrichtung · Offline-Karten");
-            addCategory(root, "Tank, Verbrauch & OBD", "Reichweite · Reserve · Adapter · Tankstellen-Preise");
-            addCategory(root, "Darstellung & Medien", "Hintergrund · DABdream+ · CarPlay");
+            addCategory(root, "Tank, Verbrauch & OBD", "Reichweite · Reserve · Adapter");
+            addCategory(root, "Darstellung & Medien", "Hintergrund · DABdream+ · Medienzugriff · Autostart");
             addCategory(root, "System & Diagnose", "Standard-Launcher · Berechtigungen · Logs · Version");
         } else if (page.equals("Karte & GPS")) {
-            LinearLayout gps = SettingsUi.card(this, root, "STANDORT");
-            gpsStatus = addStatusButton(gps, this::requestGpsPermission);
-            LinearLayout map = SettingsUi.card(this, root, "KARTE");
-            addButton(map, "Kartenstil, Zoom und Fahrtrichtung",
-                    () -> startActivity(new Intent(this, MapSettingsActivity.class)));
+        gpsStatus = addStatusButton(root, this::requestGpsPermission);
+        addButton(root, "Kartenstil, Zoom und Fahrtrichtung",
+                () -> startActivity(new Intent(this, MapSettingsActivity.class)));
         } else if (page.equals("Tank, Verbrauch & OBD")) {
-            LinearLayout car = SettingsUi.card(this, root, "FAHRZEUG");
-            addButton(car, "Tank und Reichweite", () -> startActivity(new Intent(this, RangeSettingsActivity.class)));
-            addButton(car, "OBD2-Adapter und Verbrauch", () -> startActivity(new Intent(this, Obd2SettingsActivity.class)));
-
-            LinearLayout fuel = SettingsUi.card(this, root, "TANKSTELLEN-PREISE (E10)");
-            TextView keyState = SettingsUi.text(this, FuelPriceStore.apiKey(this).isEmpty()
-                    ? "⚠ Schlüssel fehlt" : "✓ Schlüssel gespeichert", 15,
-                    FuelPriceStore.apiKey(this).isEmpty() ? GlassSkin.WARNING : GlassSkin.GREEN, true);
-            fuel.addView(keyState, new LinearLayout.LayoutParams(-1, dp(32)));
-            addButton(fuel, "Tankerkönig-Schlüssel eintragen", this::editFuelKey);
-            SettingsUi.divider(this, fuel);
-            SettingsUi.stepper(this, fuel, "Aktualisierung",
-                    () -> FuelPriceStore.intervalMinutes(this), v -> FuelPriceStore.setIntervalMinutes(this, v),
-                    5, 30, 5, v -> "alle " + v + " Minuten");
-            SettingsUi.hint(this, fuel, "Zeigt E10 von MK-T (Marktkauf Oschatz) und HEM (Dahlen) unter der Fahrzeugkachel. "
-                    + "Kostenloser Schlüssel: creativecommons.tankerkoenig.de. Preise: Tankerkönig / MTS-K (CC BY 4.0).");
+        addButton(root, "Tank und Reichweite", () -> startActivity(new Intent(this, RangeSettingsActivity.class)));
+        addButton(root, "OBD2-Adapter und Verbrauch", () -> startActivity(new Intent(this, Obd2SettingsActivity.class)));
+        addButton(root, "Tankstellen-Preise (Tankerkönig-Schlüssel)", this::editFuelKey);
+        addButton(root, "Tankstellen: Aktualisierung alle " + FuelPriceStore.intervalMinutes(this) + " Minuten",
+                this::chooseFuelInterval);
+        TextView fuelNote = text("Zeigt E10 der Marktkauf-Tankstelle Oschatz und der HEM in Dahlen auf der Fahrzeugkachel. "
+                + "Dafür wird ein kostenloser API-Schlüssel von creativecommons.tankerkoenig.de benötigt. "
+                + "Preise: Tankerkönig / Markttransparenzstelle für Kraftstoffe (CC BY 4.0).",
+                12, GlassSkin.MUTED, Typeface.NORMAL);
+        fuelNote.setPadding(dp(4), dp(6), dp(4), dp(10));
+        root.addView(fuelNote);
         } else if (page.equals("Darstellung & Medien")) {
-            LinearLayout background = SettingsUi.card(this, root, "HINTERGRUND");
-            backgroundStatus = text("", 15, GlassSkin.MUTED, Typeface.BOLD);
-            background.addView(backgroundStatus, new LinearLayout.LayoutParams(-1, dp(34)));
-            addButton(background, "Eigenes Hintergrundbild auswählen", this::selectBackgroundImage);
-            addButton(background, "Standard-Hintergrund verwenden", this::useDefaultBackground);
-            SettingsUi.hint(this, background, "Das Bild wird in den Launcher kopiert und bleibt nach Neustarts erhalten. "
-                    + "Der blaue Glass-Hintergrund steht immer zur Verfügung.");
+        section(root, "HINTERGRUND");
+        backgroundStatus = text("", 13, GlassSkin.MUTED, Typeface.BOLD);
+        backgroundStatus.setGravity(Gravity.CENTER_VERTICAL);
+        backgroundStatus.setPadding(dp(14), 0, dp(14), 0);
+        backgroundStatus.setBackground(GlassSkin.panel(this, false));
+        LinearLayout.LayoutParams bgStatusParams = new LinearLayout.LayoutParams(-1, dp(42));
+        bgStatusParams.topMargin = dp(5);
+        root.addView(backgroundStatus, bgStatusParams);
+        addButton(root, "Eigenes Hintergrundbild auswählen", this::selectBackgroundImage);
+        addButton(root, "Standard-Hintergrund verwenden", this::useDefaultBackground);
+        TextView bgNote = text("Du kannst ein Bild auswählen, das auf dem Radio gespeichert ist. "
+                + "Der originale blaue Glass-Hintergrund bleibt immer verfügbar. Ein ausgewähltes Bild wird in den Launcher kopiert und bleibt auch nach Neustarts erhalten.",
+                12, GlassSkin.MUTED, Typeface.NORMAL);
+        bgNote.setPadding(dp(4), dp(6), dp(4), dp(10));
+        root.addView(bgNote);
 
-            LinearLayout carplay = SettingsUi.card(this, root, "CARPLAY");
-            SettingsUi.toggle(this, carplay, "Nach automatischer CarPlay-Verbindung zum Launcher zurück", null,
-                    () -> CarPlayAutoReturn.enabled(this), enabled -> {
-                        CarPlayAutoReturn.setEnabled(this, enabled);
-                        if (enabled) {
-                            RangeTrackingService.ensureStarted(this);
-                            if (!CarPlayAutoReturn.hasUsageAccess(this)) {
-                                Toast.makeText(this,
-                                        "Bitte einmal Nutzungszugriff für Polo Launcher erlauben",
-                                        Toast.LENGTH_LONG).show();
-                                openUsageAccessSettings();
-                            }
+        section(root, "CARPLAY");
+        addSwitch(root, "Nach automatischer CarPlay-Verbindung zum Launcher zurück",
+                CarPlayAutoReturn.enabled(this), (button, enabled) -> {
+                    CarPlayAutoReturn.setEnabled(this, enabled);
+                    if (enabled) {
+                        RangeTrackingService.ensureStarted(this);
+                        if (!CarPlayAutoReturn.hasUsageAccess(this)) {
+                            Toast.makeText(this,
+                                    "Bitte einmal Nutzungszugriff für Polo Launcher erlauben",
+                                    Toast.LENGTH_LONG).show();
+                            openUsageAccessSettings();
                         }
-                        refreshStatus();
-                    });
-            SettingsUi.hint(this, carplay, "Öffnet sich CarPlay von selbst, wartet der Launcher 5 Sekunden auf den Verbindungsaufbau "
-                    + "und holt danach einmal den Launcher zurück. Öffnest du CarPlay selbst, bleibt es im Vordergrund.");
-            carPlayUsageStatus = addStatusButton(carplay, this::openUsageAccessSettings);
+                    }
+                    refreshStatus();
+                });
+        TextView carPlayNote = text(
+                "Wenn CarPlay sich selbst in den Vordergrund öffnet, wartet Polo Launcher 5 Sekunden "
+                        + "auf den Verbindungsaufbau und holt danach einmal den Launcher zurück. "
+                        + "Öffnest du CarPlay selbst über das Symbol oder Alle Apps, bleibt CarPlay im Vordergrund.",
+                12, GlassSkin.MUTED, Typeface.NORMAL);
+        carPlayNote.setPadding(dp(4), dp(6), dp(4), dp(4));
+        root.addView(carPlayNote);
+        carPlayUsageStatus = addStatusButton(root, this::openUsageAccessSettings);
 
-            LinearLayout dab = SettingsUi.card(this, root, "DABDREAM+ UND MEDIEN");
-            SettingsUi.toggle(this, dab, "DABdream beim Launcher-Start öffnen und zurückkehren", null,
-                    () -> getSharedPreferences("cockpit_media", MODE_PRIVATE)
-                            .getBoolean("dab_start_and_return", false),
-                    enabled -> getSharedPreferences("cockpit_media", MODE_PRIVATE).edit()
-                            .putBoolean("dab_start_and_return", enabled).apply());
-            SettingsUi.hint(this, dab, "Startet DABdream nach bestätigtem Internet einmal und kehrt nach 3 Sekunden zurück. "
-                    + "Den eigenen Autostart in DABdream dafür ausschalten.");
-            mediaStatus = addStatusButton(dab, this::openNotificationAccessSettings);
+        section(root, "DABDREAM+ UND MEDIEN");
+        android.widget.Switch dabStartup = new android.widget.Switch(this);
+        dabStartup.setText("DABdream beim Launcher-Start öffnen und zurückkehren");
+        dabStartup.setTextSize(15);
+        dabStartup.setTextColor(GlassSkin.TEXT);
+        dabStartup.setPadding(dp(14), dp(8), dp(14), dp(8));
+        dabStartup.setBackground(GlassSkin.panel(this, false));
+        dabStartup.setChecked(getSharedPreferences("cockpit_media", MODE_PRIVATE)
+                .getBoolean("dab_start_and_return", false));
+        dabStartup.setOnCheckedChangeListener((button, enabled) ->
+                getSharedPreferences("cockpit_media", MODE_PRIVATE).edit()
+                        .putBoolean("dab_start_and_return", enabled).apply());
+        LinearLayout.LayoutParams dabParams = new LinearLayout.LayoutParams(-1, -2);
+        dabParams.topMargin = dp(6);
+        root.addView(dabStartup, dabParams);
+        TextView dabNote = text("Startet DABdream nach bestätigtem Internet einmal und kehrt nach 3 Sekunden zurück. "
+                + "Den eigenen Autostart in DABdream dafür deaktivieren.", 12, GlassSkin.MUTED, Typeface.NORMAL);
+        dabNote.setPadding(dp(4), dp(6), dp(4), dp(6));
+        root.addView(dabNote);
+        mediaStatus = addStatusButton(root,
+                this::openNotificationAccessSettings);
         } else if (page.equals("System & Diagnose")) {
-            LinearLayout system = SettingsUi.card(this, root, "BERECHTIGUNGEN UND SYSTEM");
-            homeStatus = addStatusButton(system, this::requestHomeRole);
-            if (Build.VERSION.SDK_INT >= 33)
-                notificationStatus = addStatusButton(system, this::requestNotificationPermission);
-            addButton(system, "Android-Einstellungen", () -> AppLauncher.openAndroidSettings(this));
-
-            LinearLayout vehicle = SettingsUi.card(this, root, "FAHRZEUG");
-            SettingsUi.toggle(this, vehicle, "Tür vorn links: Kontakt defekt", "Die Türwarnung für diese Tür wird ausgeblendet",
-                    () -> VehiclePreferences.doorFlFault(this), enabled -> VehiclePreferences.setDoorFlFault(this, enabled));
-
-            LinearLayout info = SettingsUi.card(this, root, "HILFE UND INFO");
-            addButton(info, "Polo-Launcher-Diagnose", () -> startActivity(new Intent(this, DiagnosticsActivity.class)));
-            TextView version = text("Polo Launcher · Version " + appVersion(), 15, GlassSkin.ACCENT, Typeface.BOLD);
-            version.setGravity(Gravity.CENTER_VERTICAL);
-            root.addView(version, new LinearLayout.LayoutParams(-1, dp(1)));
-            root.removeView(version);
-            info.addView(version, new LinearLayout.LayoutParams(-1, dp(40)));
-            SettingsUi.hint(this, info, "Launcher3 bitte installiert lassen, bis alle Funktionen auf dem Radio geprüft sind.");
+        section(root, "BERECHTIGUNGEN UND SYSTEM");
+        homeStatus = addStatusButton(root, this::requestHomeRole);
+        if (Build.VERSION.SDK_INT >= 33)
+            notificationStatus = addStatusButton(root, this::requestNotificationPermission);
+        addButton(root, "Android-Einstellungen", () -> AppLauncher.openAndroidSettings(this));
+        section(root, "FAHRZEUG UND DIAGNOSE");
+        addSwitch(root, "Tür vorn links: Kontakt defekt (Warnung ausblenden)",
+                VehiclePreferences.doorFlFault(this), (button, enabled) -> VehiclePreferences.setDoorFlFault(this, enabled));
+        section(root, "HILFE UND INFO");
+        addButton(root, "Polo-Launcher-Diagnose", () -> startActivity(new Intent(this, DiagnosticsActivity.class)));
+        TextView version = text("Polo Launcher · Version " + appVersion(), 15, GlassSkin.ACCENT, Typeface.BOLD);
+        version.setGravity(Gravity.CENTER_VERTICAL);
+        version.setPadding(dp(16), 0, dp(16), 0);
+        version.setBackground(GlassSkin.panel(this, false));
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-1, dp(46));
+        versionParams.topMargin = dp(5);
+        root.addView(version, versionParams);
+        TextView note = text("Launcher3 bitte installiert lassen, bis alle Funktionen auf dem Radio geprüft sind.",
+                13, GlassSkin.MUTED, Typeface.NORMAL);
+        note.setPadding(0, dp(9), 0, 0);
+        root.addView(note);
         }
         addButton(root, page.isEmpty() ? "Zurück zum Launcher" : "Zurück zu den Einstellungen",
                 this::navigateBack);
@@ -156,11 +177,30 @@ public final class SettingsActivity extends Activity {
 
     private void addCategory(LinearLayout root, String title, String description) {
         TextView card = addButton(root, title + "  ›\n" + description, () -> showPage(title));
-        card.setTextSize(15);
-        card.setPadding(dp(16), dp(8), dp(16), dp(8));
-        card.setMinHeight(dp(72));
+        card.setTextSize(14);
+        card.setPadding(dp(14), dp(6), dp(14), dp(6));
+        card.setMinHeight(dp(54));
         card.setLayoutParams(new LinearLayout.LayoutParams(card.getLayoutParams().width, -2));
         ((LinearLayout.LayoutParams) card.getLayoutParams()).topMargin = dp(5);
+    }
+
+    private void chooseFuelInterval() {
+        int[] options = FuelPriceStore.INTERVAL_MINUTES;
+        String[] labels = new String[options.length];
+        int checked = 0;
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = options[i] + " Minuten";
+            if (options[i] == FuelPriceStore.intervalMinutes(this)) checked = i;
+        }
+        GlassSkin.dialog(this)
+                .setTitle("Preise aktualisieren alle …")
+                .setSingleChoiceItems(labels, checked, (d, which) -> {
+                    FuelPriceStore.setIntervalMinutes(this, options[which]);
+                    d.dismiss();
+                    showPage(page);
+                })
+                .setNegativeButton("Abbrechen", null)
+                .show();
     }
 
     private void editFuelKey() {
@@ -174,7 +214,6 @@ public final class SettingsActivity extends Activity {
                 .setPositiveButton("Speichern", (d, w) -> {
                     FuelPriceStore.setApiKey(this, input.getText().toString());
                     Toast.makeText(this, "Gespeichert – Preise werden geladen", Toast.LENGTH_SHORT).show();
-                    showPage(page);
                 })
                 .setNegativeButton("Abbrechen", null)
                 .show();
@@ -418,27 +457,48 @@ public final class SettingsActivity extends Activity {
         super.onDestroy();
     }
 
+    private void addSwitch(LinearLayout root, String title, boolean checked,
+                           android.widget.CompoundButton.OnCheckedChangeListener listener) {
+        android.widget.Switch toggle = new android.widget.Switch(this);
+        toggle.setText(title);
+        toggle.setTextSize(14);
+        toggle.setTextColor(GlassSkin.TEXT);
+        toggle.setPadding(dp(14), dp(8), dp(14), dp(8));
+        toggle.setBackground(GlassSkin.panel(this, false));
+        toggle.setChecked(checked);
+        toggle.setOnCheckedChangeListener(listener);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(5);
+        root.addView(toggle, params);
+    }
+
     private TextView addStatusButton(LinearLayout root, Runnable action) {
         TextView card = text("", 14, GlassSkin.TEXT, Typeface.BOLD);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(14), dp(5), dp(14), dp(5));
         card.setElevation(dp(4));
         card.setOnClickListener(v -> action.run());
-        card.setBackground(GlassSkin.touch(this, false));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
-        params.topMargin = dp(6);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(50));
+        params.topMargin = dp(5);
         root.addView(card, params);
         return card;
     }
 
+    private void section(LinearLayout root, String title) {
+        TextView heading = text(title, 15, GlassSkin.ACCENT, Typeface.BOLD);
+        heading.setPadding(dp(2), dp(10), 0, dp(2));
+        root.addView(heading, new LinearLayout.LayoutParams(-1, dp(36)));
+    }
+
     private TextView addButton(LinearLayout root, String label, Runnable action) {
-        TextView button = text(label, 16, GlassSkin.TEXT, Typeface.BOLD);
+        TextView button = text(label, 15, GlassSkin.TEXT, Typeface.BOLD);
         button.setGravity(Gravity.CENTER_VERTICAL);
-        button.setPadding(dp(16), 0, dp(16), 0);
+        button.setPadding(dp(14), 0, dp(14), 0);
         button.setBackground(GlassSkin.touch(this, false));
+        button.setElevation(dp(4));
         button.setOnClickListener(v -> action.run());
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
-        params.topMargin = dp(6);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(46));
+        params.topMargin = dp(5);
         root.addView(button, params);
         return button;
     }

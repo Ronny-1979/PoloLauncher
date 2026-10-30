@@ -35,28 +35,49 @@ public final class Obd2SettingsActivity extends Activity {
         root.setPadding(dp(28), dp(18), dp(28), dp(24));
         scroll.addView(root);
 
-        root.addView(SettingsUi.title(this, "OBD2-ADAPTER"), new LinearLayout.LayoutParams(-1, dp(46)));
+        root.addView(text("OBD2-ADAPTER UND VERBRAUCH", 25, true));
+        status = text("", 16, false);
+        root.addView(status);
 
-        LinearLayout connection = SettingsUi.card(this, root, "VERBINDUNG");
-        status = SettingsUi.text(this, "", 16, GlassSkin.TEXT, true);
-        connection.addView(status, new LinearLayout.LayoutParams(-1, -2));
-        SettingsUi.button(this, connection, "Bluetooth-Berechtigung erteilen", this::requestBluetoothPermission);
+        TextView permission = text("Bluetooth-Berechtigung erteilen", 18, true);
+        permission.setPadding(dp(16), dp(12), dp(16), dp(12));
+        permission.setBackground(GlassSkin.touch(this, false));
+        permission.setOnClickListener(v -> requestBluetoothPermission());
+        root.addView(permission, topMargin());
 
-        LinearLayout devices = SettingsUi.card(this, root, "GEKOPPELTE GERÄTE");
+        root.addView(text("Gekoppelte Bluetooth-Geräte:", 18, true));
         deviceList = new LinearLayout(this);
         deviceList.setOrientation(LinearLayout.VERTICAL);
-        devices.addView(deviceList);
-        SettingsUi.button(this, devices, "Liste aktualisieren", this::loadPairedDevices);
-        SettingsUi.hint(this, devices, "Den ELM327 zuerst in Android koppeln (PIN meist 1234 oder 0000), dann hier antippen. "
-                + "Bei einer Unterbrechung verbindet sich der Hintergrunddienst automatisch neu.");
+        root.addView(deviceList);
 
-        LinearLayout consumption = SettingsUi.card(this, root, "VERBRAUCH");
-        SettingsUi.toggle(this, consumption, "Schubabschaltung schätzen", "Im Schub wird kein Kraftstoff gezählt",
-                () -> Obd2Client.dfcoEnabled(this), on -> Obd2Client.setDfcoEnabled(this, on));
-        SettingsUi.hint(this, consumption, "Der Verbrauch wird aus Drehzahl, Geschwindigkeit, Saugrohrdruck und Ansauglufttemperatur geschätzt. "
-                + "Ø 100 KM ist der gleitende Mittelwert der letzten 100 gefahrenen Kilometer und bleibt über Neustarts erhalten.");
+        TextView rescan = text("Liste aktualisieren", 17, true);
+        rescan.setPadding(dp(16), dp(12), dp(16), dp(12));
+        rescan.setBackground(GlassSkin.touch(this, false));
+        rescan.setOnClickListener(v -> loadPairedDevices());
+        root.addView(rescan, topMargin());
 
-        SettingsUi.button(this, root, "Zurück", this::finish);
+        root.addView(text("Den ELM327 zuerst in Android koppeln (PIN meist 1234 oder 0000) und danach hier auswählen. "
+                + "Der Verbrauch wird aus Drehzahl, Geschwindigkeit, Saugrohrdruck und Ansauglufttemperatur geschätzt. "
+                + "Der sichtbare Durchschnitt (Ø 100 KM) ist der gleitende Mittelwert der letzten 100 gefahrenen Kilometer und bleibt über Neustarts erhalten. "
+                + "Die Restreichweite verwendet dasselbe gleitende Fahrprofil. "
+                + "Bei einer Unterbrechung verbindet sich der Hintergrunddienst automatisch neu.", 14, false));
+
+        android.widget.Switch fuelCut = new android.widget.Switch(this);
+        fuelCut.setText("Schubabschaltung schätzen (im Schub keinen Kraftstoff zählen)");
+        fuelCut.setTextSize(16);
+        fuelCut.setTextColor(GlassSkin.TEXT);
+        fuelCut.setChecked(Obd2Client.dfcoEnabled(this));
+        fuelCut.setOnCheckedChangeListener((button, enabled) -> Obd2Client.setDfcoEnabled(this, enabled));
+        root.addView(fuelCut, topMargin());
+        root.addView(text("Beim Rollen mit hoher Drehzahl, niedrigem Saugrohrdruck und mindestens 10 km/h kann die "
+                + "Schubabschaltung als 0 l erkannt werden. Die Diagnose zeigt, wie oft diese Schätzung verwendet wurde.",
+                14, false));
+
+        TextView back = text("Zurück", 20, true);
+        back.setPadding(dp(16), dp(14), dp(16), dp(14));
+        back.setBackground(GlassSkin.touch(this, false));
+        back.setOnClickListener(v -> finish());
+        root.addView(back, topMargin());
 
         setContentView(scroll);
         loadPairedDevices();
@@ -104,26 +125,26 @@ public final class Obd2SettingsActivity extends Activity {
     private void loadPairedDevices() {
         deviceList.removeAllViews();
         if (!hasBluetoothPermission()) {
-            deviceList.addView(SettingsUi.text(this, "Bluetooth-Berechtigung fehlt (Knopf oben)", 15, GlassSkin.MUTED, false));
+            deviceList.addView(text("Bluetooth-Berechtigung fehlt (Knopf oben)", 15, false));
             return;
         }
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
-            deviceList.addView(SettingsUi.text(this, "Kein Bluetooth auf diesem Gerät", 15, GlassSkin.MUTED, false));
+            deviceList.addView(text("Kein Bluetooth auf diesem Gerät", 15, false));
             return;
         }
         if (!adapter.isEnabled()) {
-            deviceList.addView(SettingsUi.text(this, "Bluetooth ist ausgeschaltet", 15, GlassSkin.MUTED, false));
+            deviceList.addView(text("Bluetooth ist ausgeschaltet", 15, false));
             return;
         }
         Set<BluetoothDevice> bonded;
         try { bonded = adapter.getBondedDevices(); }
         catch (SecurityException noPermission) {
-            deviceList.addView(SettingsUi.text(this, "Bluetooth-Berechtigung fehlt (Knopf oben)", 15, GlassSkin.MUTED, false));
+            deviceList.addView(text("Bluetooth-Berechtigung fehlt (Knopf oben)", 15, false));
             return;
         }
         if (bonded.isEmpty()) {
-            deviceList.addView(SettingsUi.text(this, "Keine gekoppelten Geräte. Erst in Android-Bluetooth koppeln.", 15, GlassSkin.MUTED, false));
+            deviceList.addView(text("Keine gekoppelten Geräte. Erst in Android-Bluetooth koppeln.", 15, false));
             return;
         }
         String current = Obd2Client.deviceAddress(this);
@@ -133,8 +154,7 @@ public final class Obd2SettingsActivity extends Activity {
             try { name = device.getName(); } catch (SecurityException noPermission) { name = null; }
             if (name == null || name.isEmpty()) name = address;
             boolean selected = address.equals(current);
-            TextView row = SettingsUi.text(this, (selected ? "✓ " : "") + name + "\n" + address, 16,
-                    selected ? GlassSkin.GREEN : GlassSkin.TEXT, true);
+            TextView row = text((selected ? "✓ " : "") + name + "\n" + address, 16, selected);
             row.setPadding(dp(16), dp(10), dp(16), dp(10));
             row.setBackground(GlassSkin.touch(this, selected));
             row.setOnClickListener(v -> {
@@ -146,6 +166,22 @@ public final class Obd2SettingsActivity extends Activity {
             params.topMargin = dp(6);
             deviceList.addView(row, params);
         }
+    }
+
+    private LinearLayout.LayoutParams topMargin() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(10);
+        return params;
+    }
+
+    private TextView text(String value, int size, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(bold ? GlassSkin.ACCENT : GlassSkin.TEXT);
+        view.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
+        view.setPadding(0, dp(8), 0, dp(8));
+        return view;
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
