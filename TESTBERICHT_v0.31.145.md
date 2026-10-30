@@ -134,3 +134,7 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.144
 - Zoomgeschwindigkeit 0,5 Stufen/s. Tests/Compile gruen, nicht am Radio getestet.
+
+## Nachtrag v0.31.145 (Menü-Umbau)
+- Neu: SettingsUi (Stepper, Toggle, Auswahl, Karten); keine SeekBar/Switch mehr in den Einstellungen.
+- Geprüft: Kompilierung gegen Android-API, Quelltest-Suite. Nicht auf dem Radio getestet (Optik, Tippflächen, Scrollverhalten).

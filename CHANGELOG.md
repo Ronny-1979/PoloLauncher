@@ -1,6 +1,11 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.145 / versionCode 226**. Basis v0.31.144.
+- Menü komplett neu geordnet und ohne Slider: Alle Einstellungen werden nur noch per Tipp bedient. Beim Scrollen kann nichts mehr versehentlich verstellt werden.
+- Schieberegler ersetzt durch Stufen-Tasten (− / +): Neigung, Gebäudehöhe, Zoom innerorts/außerorts, Reserve, Tankpreis-Intervall (5–30 Min.). Wischschalter ersetzt durch große Ein/Aus-Zeilen (ganze Zeile tippbar). Kartenmodus und Positionsmarke als Auswahlknöpfe.
+- Einstellungen sind in Karten mit Überschrift gruppiert (Darstellung, 3D, Zoom, Warnungen, Offline-Karte; Fahrzeug, Tankstellen-Preise; Hintergrund, CarPlay, DAB; System). Größere Tippflächen, kürzere Hinweise, Tankerkönig-Schlüssel zeigt „gespeichert/fehlt“.
+
 - Version: **0.31.144 / versionCode 225**. Basis v0.31.143.
 - Der automatische Zoom an der Ortsgrenze läuft sanfter und langsamer: 0,5 statt 0,9 Zoomstufen pro Sekunde (zwei Stufen dauern etwa 4 s). Das Nachziehen im Stand dauert 1,8 s.
 

@@ -502,10 +502,10 @@ public final class SourceAuditTest {
         requires(mapSettings, "MapPreferences.COLOR_AUTO", "Map settings expose automatic day/night mode");
         requires(mapSettings, "MapPreferences.COLOR_DAY", "Map settings expose permanent day mode");
         requires(mapSettings, "MapPreferences.COLOR_NIGHT", "Map settings expose permanent night mode");
-        requires(mapSettings, "option.setId(android.view.View.generateViewId())",
-                "Radio options have unique IDs so old selections are unchecked immediately");
-        requires(mapSettings, "option.setTag(key)", "Radio options retain their persisted preference key");
-        requires(mapSettings, "syncRadioSelection(colorModes, mode)", "Map colour mode selection refreshes immediately");
+        requires(source("SettingsUi"), "static Runnable stepper(", "Settings use tap steppers instead of sliders");
+        requires(source("SettingsUi"), "static Runnable toggle(", "Settings use whole-row toggles instead of swipe switches");
+        forbids(mapSettings, "SeekBar", "Map settings cannot be changed by accidental scrolling");
+        forbids(source("SettingsActivity"), "android.widget.Switch", "Main settings contain no swipe switches");
         requires(source("LocationAccess"), "ACCESS_FINE_LOCATION", "GPS provider requires the precise permission");
         requires(source("LocationAccess"), "lastKnownNetwork",
                 "Approximate location retains a network-provider fallback");
