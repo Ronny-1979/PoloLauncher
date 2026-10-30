@@ -506,6 +506,8 @@ public final class SourceAuditTest {
                 "Radio options have unique IDs so old selections are unchecked immediately");
         requires(mapSettings, "option.setTag(key)", "Radio options retain their persisted preference key");
         requires(mapSettings, "syncRadioSelection(colorModes, mode)", "Map colour mode selection refreshes immediately");
+        requires(source("GermanyOfflineService"), "downloadMarked(earlyPbf)",
+                "A fully downloaded PBF is reused after restart without asking the server");
         requires(source("LocationAccess"), "ACCESS_FINE_LOCATION", "GPS provider requires the precise permission");
         requires(source("LocationAccess"), "lastKnownNetwork",
                 "Approximate location retains a network-provider fallback");

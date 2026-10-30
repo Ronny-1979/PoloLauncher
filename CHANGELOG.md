@@ -1,6 +1,10 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.147 / versionCode 228**. Basis v0.31.146.
+- Fix: Nach Radio-aus während der Auswertung (Aufbau) wurden die fertig geladenen OSM-Rohdaten erneut heruntergeladen. Ursache: Wiederverwendung hing an einer erfolgreichen Server-Abfrage mit passendem Datum (beim Start oft noch kein Internet, Geofabrik aktualisiert täglich). Jetzt merkt sich eine Markierung (.ok) den vollständigen Download; beim Fortsetzen wird er ohne Server-Abfrage direkt weiter ausgewertet. Neu geladen wird nur noch bei defekten Daten oder einer ausdrücklich bestätigten Aktualisierung.
+- Hinweis: Die Auswertung selbst beginnt nach einem Abbruch wieder von vorn (ohne neuen Download).
+
 - Version: **0.31.146 / versionCode 227**. Basis v0.31.145.
 - Menü-Umbau von v0.31.145 zurückgenommen: Das gewohnte Menü (v0.31.144) ist wieder da. Neu nur: Schieberegler sind schmaler (ca. 55 % der Breite), rechts bleibt freie Fläche zum Scrollen, damit man sie beim Wischen nicht versehentlich verstellt.
 

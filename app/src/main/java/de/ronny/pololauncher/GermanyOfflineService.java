@@ -443,8 +443,16 @@ public final class GermanyOfflineService extends Service {
         UsbImportSource.Entry usbPbf = importSource == null ? null
                 : importSource.find(UsbImportLayout.trafficName(region));
         Remote remote;
+        File earlyPbf = TrafficDataStore.pbfFile(this, region);
+        // A completely downloaded PBF is recorded in a ".ok" marker. After a radio-off / reboot it is
+        // analysed again WITHOUT asking the server: no internet yet, a changed server date or a daily
+        // Geofabrik update must never trigger a second multi-hundred-MB download.
+        boolean reuseDownloaded = usbPbf == null && !updateExisting && !localTrafficValid
+                && earlyPbf != null && downloadMarked(earlyPbf);
         if (usbPbf != null) {
             remote = new Remote(true, usbPbf.size(), usbPbf.modified());
+        } else if (reuseDownloaded) {
+            remote = new Remote(true, earlyPbf.length(), earlyPbf.lastModified());
         } else {
             if (localTrafficValid && !updateExisting) {
                 progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, 0L,
@@ -484,6 +492,7 @@ public final class GermanyOfflineService extends Service {
             }
         }
         boolean completeSource = reusableTrafficSource(pbf, remote);
+        if (completeSource) markDownloaded(pbf);
         boolean activated = false;
         // A half-downloaded PBF is kept (network loss) so the next attempt resumes at that byte.
         boolean keepPartial = remote.modified > 0L && remote.size > 0L;
@@ -502,6 +511,7 @@ public final class GermanyOfflineService extends Service {
                     throw new IllegalStateException("Unvollständige OSM-Rohdaten nicht löschbar: " + name);
                 progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, remote.size,
                         "Verkehr " + name + ": lade OSM-Rohdaten …");
+                markFile(pbf).delete();
                 download(TrafficDataManager.url(region), pbf, remote, (done, total) -> {
                     TrafficDataManager.setActive(GermanyOfflineService.this, region,
                             TrafficDataManager.PHASE_DOWNLOAD);
@@ -510,6 +520,7 @@ public final class GermanyOfflineService extends Service {
                                     + (total > 0L ? " / " + GermanyOfflineStore.humanBytes(total) : ""));
                 });
                 completeSource = true;
+                markDownloaded(pbf);
             }
             checkCancelled();
             long modified = remote.modified > 0L ? remote.modified : pbf.lastModified();
@@ -572,7 +583,20 @@ public final class GermanyOfflineService extends Service {
                 pbf.delete();
             }
             if (tempDb.exists()) tempDb.delete();
+            if (!pbf.exists()) markFile(pbf).delete();
         }
+    }
+
+    private static File markFile(File pbf) { return new File(pbf.getAbsolutePath() + ".ok"); }
+
+    /** True when the PBF was fully downloaded earlier (marker holds its exact length). */
+    private static boolean downloadMarked(File pbf) {
+        if (pbf == null || !pbf.isFile() || pbf.length() < 1_000_000L) return false;
+        return readPos(markFile(pbf)) == pbf.length();
+    }
+
+    private static void markDownloaded(File pbf) {
+        if (pbf != null && pbf.isFile()) writePos(markFile(pbf), pbf.length());
     }
 
     private static boolean reusableTrafficSource(File pbf, Remote remote) {
