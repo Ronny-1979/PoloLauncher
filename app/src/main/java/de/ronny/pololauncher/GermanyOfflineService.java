@@ -193,6 +193,7 @@ public final class GermanyOfflineService extends Service {
 
             GermanyOfflineStore.markReady(this);
             if (updateExisting || importSource != null) GermanyOfflineStore.clearUpdateStatus(this);
+            GermanyOfflineStore.clearUpdateDone(this);
             // Legacy Mapsforge is kept until MapLibre has really rendered the new offline map once.
             String message = "Offline-Karte Deutschland bereit (Karte + Tempolimits + Blitzer)";
             DiagLog.add(message);
@@ -262,6 +263,12 @@ public final class GermanyOfflineService extends Service {
                 : importSource.find(UsbImportLayout.mapName(region));
         if (usbMap != null && importMap(usbMap, name, target, part, step, totalSteps)) return;
 
+        final String doneKey = "map:" + region;
+        if (updateExisting && importSource == null && GermanyOfflineStore.updateDone(this, doneKey)) {
+            progress(GermanyOfflineStore.PHASE_MAP, step, totalSteps, 0L, 0L,
+                    "Karte " + name + " bereits in diesem Update erledigt");
+            return;
+        }
         boolean localValid = target.isFile() && validMbtiles(target);
         // RESUME means exactly that: continue the interrupted build. A locally valid MBTiles
         // must never be replaced merely because HEAD now reports another size/date. Geofabrik
@@ -276,8 +283,9 @@ public final class GermanyOfflineService extends Service {
 
         // A complete .part can survive a process/service interruption between download and
         // atomic activation. In resume mode activate it locally instead of deleting/downloading it.
-        if (!localValid && !updateExisting && part.isFile() && validMbtiles(part)) {
+        if (part.isFile() && (!localValid || updateExisting) && validMbtiles(part)) {
             atomicReplace(part, target);
+            GermanyOfflineStore.markUpdateDone(this, doneKey);
             DiagLog.add("Deutschland Karte " + name
                     + ": vollständigen Teil-Download beim Fortsetzen übernommen");
             progress(GermanyOfflineStore.PHASE_MAP, step, totalSteps, 0L, 0L,
@@ -290,6 +298,7 @@ public final class GermanyOfflineService extends Service {
                 target.length(), target.lastModified(), remote.size, remote.modified))) {
             progress(GermanyOfflineStore.PHASE_MAP, step, totalSteps, 0L, 0L,
                     "Karte " + name + " bereits aktuell");
+            GermanyOfflineStore.markUpdateDone(this, doneKey);
             return;
         }
 
@@ -312,6 +321,7 @@ public final class GermanyOfflineService extends Service {
         }
         atomicReplace(part, target);
         if (remote.modified > 0L) target.setLastModified(remote.modified);
+        GermanyOfflineStore.markUpdateDone(this, doneKey);
     }
 
     /** Takes a map file from the USB stick. Returns false if the stick copy is unusable (normal flow continues). */
@@ -438,6 +448,12 @@ public final class GermanyOfflineService extends Service {
     }
 
     private void installTraffic(String region, String name, int step, int totalSteps) throws Exception {
+        final String doneKey = "traffic:" + region;
+        if (updateExisting && importSource == null && GermanyOfflineStore.updateDone(this, doneKey)) {
+            progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, 0L,
+                    "Verkehr " + name + " bereits in diesem Update erledigt");
+            return;
+        }
         TrafficDataManager.Status current = TrafficDataManager.status(this, region);
         boolean localTrafficValid = current.ready && hasCompactTraffic(region);
         UsbImportSource.Entry usbPbf = importSource == null ? null
@@ -447,8 +463,7 @@ public final class GermanyOfflineService extends Service {
         // A completely downloaded PBF is recorded in a ".ok" marker. After a radio-off / reboot it is
         // analysed again WITHOUT asking the server: no internet yet, a changed server date or a daily
         // Geofabrik update must never trigger a second multi-hundred-MB download.
-        boolean reuseDownloaded = usbPbf == null && !updateExisting && !localTrafficValid
-                && earlyPbf != null && downloadMarked(earlyPbf);
+        boolean reuseDownloaded = usbPbf == null && earlyPbf != null && downloadMarked(earlyPbf);
         if (usbPbf != null) {
             remote = new Remote(true, usbPbf.size(), usbPbf.modified());
         } else if (reuseDownloaded) {
@@ -466,6 +481,7 @@ public final class GermanyOfflineService extends Service {
                 current.sourceSize, current.sourceModified, remote.size, remote.modified))) {
             progress(GermanyOfflineStore.PHASE_TRAFFIC, step, totalSteps, 0L, 0L,
                     "Verkehr " + name + " bereits aktuell");
+            GermanyOfflineStore.markUpdateDone(this, doneKey);
             return;
         }
 
@@ -564,6 +580,7 @@ public final class GermanyOfflineService extends Service {
             if (!TrafficDataStore.atomicActivate(this, region, tempDb))
                 throw new IllegalStateException("Verkehrsdaten nicht aktivierbar: " + name);
             activated = true;
+            GermanyOfflineStore.markUpdateDone(this, doneKey);
             TrafficDataManager.markReady(this, region, modified, size, stats.segments, stats.cameras);
             TrafficDataManager.clearActive(this, TrafficDataManager.PHASE_IDLE);
             DiagLog.add("Deutschland Verkehr " + name + ": " + stats.segments

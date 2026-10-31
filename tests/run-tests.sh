@@ -66,7 +66,7 @@ if ! grep -Fq 'putExtra(EXTRA_UPDATE_EXISTING, updateExisting)' app/src/main/jav
   echo "GermanyResumeMapTest: FEHLER - gültige Karten werden beim Fortsetzen nicht sicher beibehalten" >&2
   exit 1
 fi
-if ! grep -Fq '!localValid && !updateExisting && part.isFile() && validMbtiles(part)' "$traffic_service"; then
+if ! grep -Fq 'part.isFile() && (!localValid || updateExisting) && validMbtiles(part)' "$traffic_service"; then
   echo "GermanyResumeMapTest: FEHLER - vollständiger Karten-.part-Download wird beim Fortsetzen nicht übernommen" >&2
   exit 1
 fi

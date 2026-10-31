@@ -1,6 +1,10 @@
 # PoloLauncher – Änderungsverlauf (neueste Version oben)
 
 
+- Version: **0.31.148 / versionCode 229**. Basis v0.31.147.
+- Fix Karten-Update: Ein laufendes Update merkt sich jetzt dauerhaft, welche Karten und Verkehrsdaten es schon erledigt hat. Nach Radio-aus/Neustart werden diese nicht mehr beim Server abgefragt und nicht erneut geladen (vorher: der Server-Zeitstempel ist täglich neuer, dadurch wurde eine gerade geladene Karte wieder als „neu“ erkannt und von vorn geladen).
+- Ein vollständig geladener Karten-Teil-Download (.part) wird beim Fortsetzen auch im Update-Modus übernommen statt neu geladen. Vollständige OSM-Rohdaten (.ok-Markierung) werden auch im Update-Modus ohne Server-Abfrage weiterverwendet.
+
 - Version: **0.31.147 / versionCode 228**. Basis v0.31.146.
 - Fix: Nach Radio-aus während der Auswertung (Aufbau) wurden die fertig geladenen OSM-Rohdaten erneut heruntergeladen. Ursache: Wiederverwendung hing an einer erfolgreichen Server-Abfrage mit passendem Datum (beim Start oft noch kein Internet, Geofabrik aktualisiert täglich). Jetzt merkt sich eine Markierung (.ok) den vollständigen Download; beim Fortsetzen wird er ohne Server-Abfrage direkt weiter ausgewertet. Neu geladen wird nur noch bei defekten Daten oder einer ausdrücklich bestätigten Aktualisierung.
 - Hinweis: Die Auswertung selbst beginnt nach einem Abbruch wieder von vorn (ohne neuen Download).

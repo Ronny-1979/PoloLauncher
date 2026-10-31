@@ -275,7 +275,28 @@ final class GermanyOfflineStore {
 
     static void startUpdate(Context c) {
         if (!ready(c)) return;
+        clearUpdateDone(c);
         startService(c, true);
+    }
+
+    /**
+     * Regions that this update run has already handled (replaced or found current). After a power-off
+     * or restart the resumed update skips them and does not ask the server again, so a map that was
+     * just downloaded is never downloaded a second time because the server date moved on meanwhile.
+     */
+    static boolean updateDone(Context c, String key) {
+        return prefs(c).getStringSet("update_done", java.util.Collections.<String>emptySet()).contains(key);
+    }
+
+    static void markUpdateDone(Context c, String key) {
+        java.util.Set<String> copy = new java.util.HashSet<>(
+                prefs(c).getStringSet("update_done", java.util.Collections.<String>emptySet()));
+        copy.add(key);
+        prefs(c).edit().putStringSet("update_done", copy).commit();
+    }
+
+    static void clearUpdateDone(Context c) {
+        prefs(c).edit().remove("update_done").commit();
     }
 
     /** Import maps from a USB stick/folder (see {@link UsbImportSource}); builds everything locally. */

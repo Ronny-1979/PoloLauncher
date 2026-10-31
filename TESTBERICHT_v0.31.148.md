@@ -141,3 +141,6 @@ Basis v0.31.95 (versionCode 177). Lokaler Kachelserver + Versuchsleiter. run-tes
 
 ## Nachtrag v0.31.147
 - Marker .ok für vollständigen PBF-Download; Fortsetzen ohne Server-Abfrage. Kompiliert, Quelltest-Suite; nicht auf dem Radio getestet.
+
+## Nachtrag v0.31.148
+- Update-Fortschrittsliste (update_done) pro Karte/Verkehr; Update setzt nach Neustart genau fort. Kompiliert, Quelltest-Suite; nicht auf dem Radio getestet.

@@ -508,6 +508,8 @@ public final class SourceAuditTest {
         requires(mapSettings, "syncRadioSelection(colorModes, mode)", "Map colour mode selection refreshes immediately");
         requires(source("GermanyOfflineService"), "downloadMarked(earlyPbf)",
                 "A fully downloaded PBF is reused after restart without asking the server");
+        requires(source("GermanyOfflineService"), "GermanyOfflineStore.updateDone(this, doneKey)",
+                "A resumed update skips regions it already finished instead of asking the server again");
         requires(source("LocationAccess"), "ACCESS_FINE_LOCATION", "GPS provider requires the precise permission");
         requires(source("LocationAccess"), "lastKnownNetwork",
                 "Approximate location retains a network-provider fallback");
